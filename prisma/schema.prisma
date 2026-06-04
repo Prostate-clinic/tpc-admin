@@ -1,0 +1,119 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  DOCTOR
+  FRONTDESK
+}
+
+enum ServiceCategory {
+  SURGICAL
+  CONSULTATION
+  DIAGNOSTICS
+  IMAGING
+}
+
+enum AppointmentStatus {
+  BOOKED
+  CLOSED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(FRONTDESK)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  doctor    Doctor?
+}
+
+model Doctor {
+  id           String             @id @default(cuid())
+  name         String
+  specialty    String
+  bio          String?
+  image        String?
+  userId       String?            @unique
+  user         User?              @relation(fields: [userId], references: [id])
+  slots        AppointmentSlot[]
+  appointments Appointment[]
+}
+
+model Service {
+  id           String           @id @default(cuid())
+  name         String
+  category     ServiceCategory
+  duration     Int
+  price        Decimal          @db.Decimal(10, 2)
+  description  String?
+  focus        String[]
+  appointments Appointment[]
+  createdAt    DateTime         @default(now())
+}
+
+model Patient {
+  id           String        @id @default(cuid())
+  name         String
+  email        String?
+  phone        String?
+  appointments Appointment[]
+  createdAt    DateTime      @default(now())
+}
+
+model Appointment {
+  id        String            @id @default(cuid())
+  date      DateTime          @db.Date
+  startTime String
+  endTime   String
+  status    AppointmentStatus @default(BOOKED)
+  notes     String?
+  patientId String
+  patient   Patient           @relation(fields: [patientId], references: [id])
+  doctorId  String
+  doctor    Doctor            @relation(fields: [doctorId], references: [id])
+  serviceId String
+  service   Service           @relation(fields: [serviceId], references: [id])
+  payment   Payment?
+  slotId    String?           @unique
+  slot      AppointmentSlot?  @relation(fields: [slotId], references: [id])
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+}
+
+model AppointmentSlot {
+  id          String       @id @default(cuid())
+  date        DateTime     @db.Date
+  startTime   String
+  endTime     String
+  isBooked    Boolean      @default(false)
+  doctorId    String
+  doctor      Doctor       @relation(fields: [doctorId], references: [id])
+  appointment Appointment?
+  createdAt   DateTime     @default(now())
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  amount        Decimal       @db.Decimal(10, 2)
+  status        PaymentStatus @default(COMPLETED)
+  appointmentId String        @unique
+  appointment   Appointment   @relation(fields: [appointmentId], references: [id])
+  createdAt     DateTime      @default(now())
+}
