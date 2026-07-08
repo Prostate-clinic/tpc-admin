@@ -155,7 +155,7 @@ export const nestApi = {
   },
 
   updateAppointment(id: string, data: { status?: string; notes?: string }) {
-    return request<{ appointment: unknown }>(`/appointments/${id}`, {
+    return request<{ appointment: unknown}>(`/appointments/${id}`, {
       method: "PATCH",
       body: data,
     });
