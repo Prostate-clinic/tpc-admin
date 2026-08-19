@@ -5,12 +5,29 @@ import { useAuth } from "@/contexts/AuthContext";
 import { nestApi } from "@/lib/nest-api";
 
 type Appointment = {
-  id: string; date: string; startTime: string; endTime: string; status: string; notes: string | null;
+  id: string;
+  /** UTC instants. The clinic-local wall clock is derived for display. */
+  startAt: string;
+  endAt: string;
+  status: string;
   patient: { name: string; email: string | null; phone: string | null };
   doctor: { name: string; specialty: string };
-  service: { name: string; price: string };
+  consultationType: { name: string; durationMinutes: number };
   payment: { amount: string; status: string } | null;
 };
+
+/** Renders a UTC instant in the clinic's timezone, not the browser's. */
+const CLINIC_TZ = "Africa/Lagos";
+
+const fmtDate = (iso: string) =>
+  new Date(iso).toLocaleDateString("en-US", {
+    month: "short", day: "numeric", year: "numeric", timeZone: CLINIC_TZ,
+  });
+
+const fmtTime = (iso: string) =>
+  new Date(iso).toLocaleTimeString("en-US", {
+    hour: "2-digit", minute: "2-digit", hour12: false, timeZone: CLINIC_TZ,
+  });
 
 export default function BookedAppointmentsPage() {
   const { user } = useAuth();
@@ -20,20 +37,34 @@ export default function BookedAppointmentsPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const res = await nestApi.getAppointments("BOOKED");
+      const res = user?.role === "DOCTOR" ? await nestApi.getMyAppointments("CONFIRMED") : await nestApi.getAppointments("CONFIRMED");
       setAppointments(res.appointments as Appointment[]);
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
   useEffect(() => { load(); }, [user]);
 
-  const closeAppointment = async (id: string) => {
-    if (!confirm("Close this appointment?")) return;
+  // "Close" is now COMPLETED — the consultation happened. A patient who never
+  // turned up is NO_SHOW, which the old single CLOSED status silently lost.
+  const completeAppointment = async (id: string) => {
+    if (!confirm("Mark this appointment as completed?")) return;
     try {
-      await nestApi.updateAppointment(id, { status: "CLOSED" });
+      await nestApi.updateAppointmentStatus(id, "COMPLETED");
       setAppointments((prev) => prev.filter((a) => a.id !== id));
     } catch (e) {
       console.error(e);
+      alert(e instanceof Error ? e.message : "Could not complete appointment");
+    }
+  };
+
+  const markNoShow = async (id: string) => {
+    if (!confirm("Mark this patient as a no-show?")) return;
+    try {
+      await nestApi.updateAppointmentStatus(id, "NO_SHOW");
+      setAppointments((prev) => prev.filter((a) => a.id !== id));
+    } catch (e) {
+      console.error(e);
+      alert(e instanceof Error ? e.message : "Could not mark no-show");
     }
   };
 
@@ -65,8 +96,8 @@ export default function BookedAppointmentsPage() {
               <div className="mt-3 grid gap-2 text-sm text-slate-600 sm:grid-cols-3">
                 <div>
                   <span className="text-xs text-slate-400">Date & Time</span>
-                  <p>{new Date(apt.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p>
-                  <p>{apt.startTime} - {apt.endTime}</p>
+                  <p>{fmtDate(apt.startAt)}</p>
+                  <p>{fmtTime(apt.startAt)} - {fmtTime(apt.endAt)}</p>
                 </div>
                 <div>
                   <span className="text-xs text-slate-400">Doctor</span>
@@ -75,7 +106,7 @@ export default function BookedAppointmentsPage() {
                 </div>
                 <div>
                   <span className="text-xs text-slate-400">Service</span>
-                  <p>{apt.service.name}</p>
+                  <p>{apt.consultationType.name}</p>
                 </div>
               </div>
               {apt.payment && (
@@ -83,10 +114,14 @@ export default function BookedAppointmentsPage() {
                   Payment: ₦{Number(apt.payment.amount).toLocaleString()} ✓
                 </span>
               )}
-              <div className="mt-3 flex justify-end">
-                <button onClick={() => closeAppointment(apt.id)}
-                  className="rounded-full border border-red-200 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50">
-                  Close Appointment
+              <div className="mt-3 flex justify-end gap-2">
+                <button onClick={() => markNoShow(apt.id)}
+                  className="rounded-full border border-amber-200 px-3 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50">
+                  No Show
+                </button>
+                <button onClick={() => completeAppointment(apt.id)}
+                  className="rounded-full border border-emerald-200 px-3 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50">
+                  Mark Completed
                 </button>
               </div>
             </div>

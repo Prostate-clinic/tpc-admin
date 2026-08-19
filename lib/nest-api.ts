@@ -28,6 +28,105 @@ export type DoctorAdminRecord = {
 
 export type BlogStatus = "DRAFT" | "PUBLISHED";
 
+// ── Booking engine ─────────────────────────────────────────────────────────
+//
+// Slots are COMPUTED by the backend from a doctor's weekly schedule; they are
+// not rows and cannot be created. `ScheduleBlock` is the thing you configure;
+// `Slot` is the thing that falls out of it.
+
+/** 0 = Sunday … 6 = Saturday. Times are clinic-local `HH:mm`. */
+export type ScheduleBlock = {
+  id?: string;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  effectiveFrom?: string;
+  effectiveTo?: string | null;
+};
+
+export type Slot = {
+  startAt: string;
+  endAt: string;
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+};
+
+/** When `slots` is empty, `reason` says why — so the UI can be specific. */
+export type UnavailableReason =
+  | "HOLIDAY"
+  | "ON_LEAVE"
+  | "NOT_WORKING"
+  | "DAILY_LIMIT_REACHED"
+  | "OUTSIDE_BOOKING_WINDOW"
+  | "FULLY_BOOKED"
+  | null;
+
+export type AvailabilityDay = {
+  date: string;
+  slots: Slot[];
+  reason: UnavailableReason;
+};
+
+export type BlockedTimeReason =
+  | "SURGERY"
+  | "WARD_ROUNDS"
+  | "MEETING"
+  | "LUNCH"
+  | "EMERGENCY"
+  | "ADMIN_OVERRIDE"
+  | "OTHER";
+
+export type BlockedTime = {
+  id: string;
+  startAt: string;
+  endAt: string;
+  reason: BlockedTimeReason;
+  note?: string | null;
+};
+
+export type ExceptionType =
+  | "VACATION"
+  | "PUBLIC_HOLIDAY"
+  | "CONFERENCE"
+  | "EMERGENCY_LEAVE"
+  | "PERSONAL_LEAVE"
+  | "HALF_DAY"
+  | "CUSTOM_HOURS";
+
+export type ScheduleException = {
+  id: string;
+  type: ExceptionType;
+  startDate: string;
+  endDate: string;
+  startMinute?: number | null;
+  endMinute?: number | null;
+  reason?: string | null;
+};
+
+export type ConsultationType = {
+  id: string;
+  name: string;
+  durationMinutes: number;
+  fee: string;
+  isVideo: boolean;
+};
+
+/**
+ * The full clinical lifecycle. Note there is no longer a `CLOSED` status — it
+ * was ambiguous (closed by whom? did the patient attend?) and is replaced by the
+ * distinct outcomes COMPLETED, CANCELLED, REJECTED and NO_SHOW.
+ */
+export type AppointmentStatus =
+  | "PENDING"
+  | "CONFIRMED"
+  | "CHECKED_IN"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "CANCELLED"
+  | "REJECTED"
+  | "NO_SHOW";
+
 export type PaginationMeta = {
   page: number;
   limit: number;
@@ -149,15 +248,42 @@ export const nestApi = {
     });
   },
 
-  getAppointments(status?: string) {
+  getAppointments(status?: AppointmentStatus) {
     const query = status ? `?status=${encodeURIComponent(status)}` : "";
     return request<{ appointments: unknown[] }>(`/appointments${query}`, { method: "GET" });
   },
 
-  updateAppointment(id: string, data: { status?: string; notes?: string }) {
-    return request<{ appointment: unknown}>(`/appointments/${id}`, {
+  /** The signed-in doctor's own appointments. */
+  getMyAppointments(status?: AppointmentStatus) {
+    const query = status ? `?status=${encodeURIComponent(status)}` : "";
+    return request<{ appointments: unknown[] }>(`/appointments/my-schedule${query}`, {
+      method: "GET",
+    });
+  },
+
+  /**
+   * Moves an appointment through the clinical lifecycle. The backend enforces a
+   * transition table, so an illegal move (e.g. re-opening a COMPLETED
+   * appointment) comes back as a 409 rather than silently corrupting state.
+   */
+  updateAppointmentStatus(id: string, status: AppointmentStatus, reason?: string) {
+    return request<{ appointment: unknown }>(`/appointments/${id}/status`, {
       method: "PATCH",
-      body: data,
+      body: { status, reason },
+    });
+  },
+
+  cancelAppointment(id: string, reason?: string, overrideNotice?: boolean) {
+    return request<{ appointment: unknown }>(`/appointments/${id}/cancel`, {
+      method: "PATCH",
+      body: { reason, overrideNotice },
+    });
+  },
+
+  rescheduleAppointment(id: string, startAt: string, reason?: string) {
+    return request<{ appointment: unknown }>(`/appointments/${id}/reschedule`, {
+      method: "PATCH",
+      body: { startAt, reason },
     });
   },
 
@@ -165,22 +291,84 @@ export const nestApi = {
     return request<{ payments: unknown[] }>("/payments", { method: "GET" });
   },
 
-  getSlots(doctorId?: string) {
+  // ── Schedules ────────────────────────────────────────────────────────────
+  //
+  // `POST /slots` is gone. Doctors no longer hand-create slots: they declare a
+  // recurring weekly schedule, and the backend computes every bookable slot
+  // from it (minus leave, holidays, blocked time and existing appointments).
+  //
+  // Read availability with `getAvailability`; configure it with these.
+
+  getWeeklySchedule(doctorId?: string) {
     const query = doctorId ? `?doctorId=${encodeURIComponent(doctorId)}` : "";
-    return request<{ slots: unknown[] }>(`/slots${query}`, { method: "GET" });
+    return request<{ schedule: ScheduleBlock[] }>(`/schedules${query}`, { method: "GET" });
   },
 
-  createSlot(data: { date: string; startTime: string; endTime: string; doctorId?: string }) {
-    const idempotencyKey =
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random()}`;
-
-    return request<{ slot: unknown }>("/slots", {
-      method: "POST",
-      headers: { "x-idempotency-key": idempotencyKey },
+  setWeeklySchedule(data: {
+    blocks: { dayOfWeek: number; startTime: string; endTime: string }[];
+    effectiveFrom?: string;
+    doctorId?: string;
+  }) {
+    return request<{ schedule: ScheduleBlock[] }>("/schedules", {
+      method: "PUT",
       body: data,
     });
+  },
+
+  getAvailability(params: { doctorId: string; consultationTypeId: string; date: string }) {
+    const query = new URLSearchParams(params).toString();
+    return request<AvailabilityDay>(`/availability?${query}`, { method: "GET" });
+  },
+
+  getBlockedTime(doctorId?: string) {
+    const query = doctorId ? `?doctorId=${encodeURIComponent(doctorId)}` : "";
+    return request<{ blockedTime: BlockedTime[] }>(`/schedules/blocked-time${query}`, {
+      method: "GET",
+    });
+  },
+
+  createBlockedTime(data: {
+    startAt: string;
+    endAt: string;
+    reason: BlockedTimeReason;
+    note?: string;
+    doctorId?: string;
+  }) {
+    return request<{ blockedTime: BlockedTime }>("/schedules/blocked-time", {
+      method: "POST",
+      body: data,
+    });
+  },
+
+  deleteBlockedTime(id: string) {
+    return request<{ message?: string }>(`/schedules/blocked-time/${id}`, { method: "DELETE" });
+  },
+
+  createException(data: {
+    type: ExceptionType;
+    startDate: string;
+    endDate: string;
+    startTime?: string;
+    endTime?: string;
+    reason?: string;
+    doctorId?: string;
+  }) {
+    return request<{
+      exception: ScheduleException;
+      affectedAppointments: unknown[];
+      message: string;
+    }>("/schedules/exceptions", { method: "POST", body: data });
+  },
+
+  getExceptions(doctorId?: string) {
+    const query = doctorId ? `?doctorId=${encodeURIComponent(doctorId)}` : "";
+    return request<{ exceptions: ScheduleException[] }>(`/schedules/exceptions${query}`, {
+      method: "GET",
+    });
+  },
+
+  deleteException(id: string) {
+    return request<{ message?: string }>(`/schedules/exceptions/${id}`, { method: "DELETE" });
   },
 
   getAdminDoctors() {

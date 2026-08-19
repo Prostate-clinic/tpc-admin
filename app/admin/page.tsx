@@ -8,18 +8,26 @@ import { nestApi } from "@/lib/nest-api";
 
 export default function AdminDashboard() {
   const { user } = useAuth();
-  const [stats, setStats] = useState({ booked: 0, closed: 0, payments: 0, slots: 0 });
+  const [stats, setStats] = useState({ booked: 0, completed: 0, payments: 0, workingDays: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
       try {
-        const [bookedRes, closedRes] = await Promise.all([
-          nestApi.getAppointments("BOOKED"),
-          nestApi.getAppointments("CLOSED"),
+        // CLOSED is gone. It conflated "the consultation happened" with "we
+        // stopped tracking it" — COMPLETED is the honest replacement, and
+        // NO_SHOW / CANCELLED now carry the outcomes it used to hide.
+        const [bookedRes, completedRes] = await Promise.all([
+          user?.role === "DOCTOR"
+            ? nestApi.getMyAppointments("CONFIRMED")
+            : nestApi.getAppointments("CONFIRMED"),
+          user?.role === "DOCTOR"
+            ? nestApi.getMyAppointments("COMPLETED")
+            : nestApi.getAppointments("COMPLETED"),
         ]);
+
         const booked = bookedRes.appointments?.length || 0;
-        const closed = closedRes.appointments?.length || 0;
+        const completed = completedRes.appointments?.length || 0;
 
         let payments = 0;
         if (user?.role !== "DOCTOR") {
@@ -27,23 +35,31 @@ export default function AdminDashboard() {
           payments = pRes.payments?.length || 0;
         }
 
-        let slots = 0;
-        if (user?.role === "DOCTOR" && user.doctorId) {
-          const sRes = await nestApi.getSlots(user.doctorId);
-          slots = sRes.slots?.length || 0;
+        // "Open slots" is no longer a countable thing: slots are computed per
+        // consultation type per day, so the number depends on what you are
+        // asking about. The meaningful figure a doctor can act on is how many
+        // days a week they have declared themselves available.
+        let workingDays = 0;
+        if (user?.role === "DOCTOR") {
+          const { schedule } = await nestApi.getWeeklySchedule();
+          workingDays = new Set(schedule.map((block) => block.dayOfWeek)).size;
         }
 
-        setStats({ booked, closed, payments, slots });
-      } catch (e) { console.error(e); } finally { setLoading(false); }
+        setStats({ booked, completed, payments, workingDays });
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
     }
     load();
   }, [user]);
 
   const cards = [
     { label: "Booked Appointments", value: stats.booked, icon: CalendarDays, color: "bg-indigo-50 text-indigo-700", href: "/admin/appointments", show: true },
-    { label: "Closed Appointments", value: stats.closed, icon: ClipboardCheck, color: "bg-emerald-50 text-emerald-700", href: "/admin/appointments/closed", show: user?.role !== "DOCTOR" },
+    { label: "Completed Appointments", value: stats.completed, icon: ClipboardCheck, color: "bg-emerald-50 text-emerald-700", href: "/admin/appointments/closed", show: user?.role !== "DOCTOR" },
     { label: "Payments Received", value: stats.payments, icon: CreditCard, color: "bg-amber-50 text-amber-700", href: "/admin/payments", show: user?.role !== "DOCTOR" },
-    { label: "Open Slots", value: stats.slots, icon: Clock, color: "bg-cyan-50 text-cyan-700", href: "/admin/slots", show: user?.role === "DOCTOR" || user?.role === "ADMIN" },
+    { label: "Working Days / Week", value: stats.workingDays, icon: Clock, color: "bg-cyan-50 text-cyan-700", href: "/admin/slots", show: user?.role === "DOCTOR" },
   ];
 
   return (
