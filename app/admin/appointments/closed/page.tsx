@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { nestApi } from "@/lib/nest-api";
+import { nestApi, PaginationMeta } from "@/lib/nest-api";
 import { useAuth } from "@/contexts/AuthContext";
+import Pager from "@/components/Pager";
 
 type Appointment = {
   id: string;
@@ -32,18 +33,22 @@ const fmtTime = (iso: string) =>
 export default function ClosedAppointmentsPage() {
   const { user } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [pagination, setPagination] = useState<PaginationMeta | null>(null);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = user?.role === "DOCTOR"
-          ? await nestApi.getMyAppointments("COMPLETED")
-          : await nestApi.getAppointments("COMPLETED");
-        setAppointments(res.appointments as Appointment[]);
-      } catch (e) { console.error(e); } finally { setLoading(false); }
-    })();
-  }, [user]);
+  const load = async () => {
+    setLoading(true);
+    try {
+      const res = user?.role === "DOCTOR"
+        ? await nestApi.getMyAppointments("COMPLETED", page)
+        : await nestApi.getAppointments("COMPLETED", page);
+      setAppointments(res.appointments as Appointment[]);
+      setPagination(res.pagination);
+    } catch (e) { console.error(e); } finally { setLoading(false); }
+  };
+
+  useEffect(() => { load(); }, [user, page]);
 
   if (loading) return <p className="text-sm text-slate-500">Loading...</p>;
 
@@ -79,6 +84,8 @@ export default function ClosedAppointmentsPage() {
           ))}
         </div>
       )}
+
+      <Pager pagination={pagination} onPage={setPage} />
     </div>
   );
 }

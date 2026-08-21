@@ -7,8 +7,8 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "IMO Admin - Robotics Center",
-  description: "Admin portal for IMO Robotics Center",
+  title: "Admin Portal - Imo Robotic Surgery and Oncology Center",
+  description: "Admin portal for Imo Robotic Surgery and Oncology Center",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

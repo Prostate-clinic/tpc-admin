@@ -249,29 +249,34 @@ export const nestApi = {
   },
 
   /**
-   * `status` accepts one status or a list (sent comma-separated). A fresh
-   * patient booking is PENDING until payment or staff confirmation, so pass the
-   * active statuses to see bookings that still need attention.
+   * `status` accepts one status or a list (sent comma-separated); omit for
+   * everything. Paginated: pass `page`/`limit` (max 100), read `pagination`.
    */
-  getAppointments(status?: AppointmentStatus | AppointmentStatus[]) {
-    const query = status
-      ? `?status=${(Array.isArray(status) ? status : [status])
-          .map((s) => encodeURIComponent(s))
-          .join(",")}`
-      : "";
-    return request<{ appointments: unknown[] }>(`/appointments${query}`, { method: "GET" });
+  getAppointments(status?: AppointmentStatus | AppointmentStatus[], page = 1, limit = 20) {
+    const params = new URLSearchParams();
+    if (status) {
+      params.set("status", (Array.isArray(status) ? status : [status]).join(","));
+    }
+    params.set("page", String(page));
+    params.set("limit", String(limit));
+    return request<{ appointments: unknown[]; pagination: PaginationMeta }>(
+      `/appointments?${params.toString()}`,
+      { method: "GET" },
+    );
   },
 
-  /** The signed-in doctor's own appointments. */
-  getMyAppointments(status?: AppointmentStatus | AppointmentStatus[]) {
-    const query = status
-      ? `?status=${(Array.isArray(status) ? status : [status])
-          .map((s) => encodeURIComponent(s))
-          .join(",")}`
-      : "";
-    return request<{ appointments: unknown[] }>(`/appointments/my-schedule${query}`, {
-      method: "GET",
-    });
+  /** The signed-in doctor's own appointments. Same contract as getAppointments. */
+  getMyAppointments(status?: AppointmentStatus | AppointmentStatus[], page = 1, limit = 20) {
+    const params = new URLSearchParams();
+    if (status) {
+      params.set("status", (Array.isArray(status) ? status : [status]).join(","));
+    }
+    params.set("page", String(page));
+    params.set("limit", String(limit));
+    return request<{ appointments: unknown[]; pagination: PaginationMeta }>(
+      `/appointments/my-schedule?${params.toString()}`,
+      { method: "GET" },
+    );
   },
 
   /**
@@ -287,18 +292,22 @@ export const nestApi = {
 
   /**
    * The clinic-wide audit feed. Every action on every appointment — who did
-   * what, when, and to which booking. Admin only.
+   * what, when, and to which booking. Admin only. Paginated.
    */
-  getActivityLog(filters?: { action?: string; actorType?: string; take?: number }) {
-    const query = new URLSearchParams(
-      Object.entries(filters ?? {}).filter(([, v]) => v !== undefined && v !== "") as [
-        string,
-        string,
-      ][],
-    ).toString();
-    return request<{ entries: unknown[] }>(`/appointments/activity${query ? `?${query}` : ""}`, {
-      method: "GET",
-    });
+  getActivityLog(
+    filters?: { action?: string; actorType?: string },
+    page = 1,
+    limit = 20,
+  ) {
+    const params = new URLSearchParams();
+    if (filters?.action) params.set("action", filters.action);
+    if (filters?.actorType) params.set("actorType", filters.actorType);
+    params.set("page", String(page));
+    params.set("limit", String(limit));
+    return request<{ entries: unknown[]; pagination: PaginationMeta }>(
+      `/appointments/activity?${params.toString()}`,
+      { method: "GET" },
+    );
   },
 
   /**

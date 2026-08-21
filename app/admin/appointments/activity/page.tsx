@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { nestApi } from "@/lib/nest-api";
+import { nestApi, PaginationMeta } from "@/lib/nest-api";
+import Pager from "@/components/Pager";
 
 type ActivityEntry = {
   id: string;
@@ -93,14 +94,17 @@ function actionDetail(e: ActivityEntry): string | null {
 
 export default function ActivityLogPage() {
   const [entries, setEntries] = useState<ActivityEntry[]>([]);
+  const [pagination, setPagination] = useState<PaginationMeta | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionFilter, setActionFilter] = useState<string>("");
+  const [page, setPage] = useState(1);
 
-  const load = async (action: string) => {
+  const load = async (action: string, p: number) => {
     setLoading(true);
     try {
-      const res = await nestApi.getActivityLog({ action: action || undefined, take: 300 });
+      const res = await nestApi.getActivityLog({ action: action || undefined }, p);
       setEntries(res.entries as ActivityEntry[]);
+      setPagination(res.pagination);
     } catch (e) {
       console.error(e);
     } finally {
@@ -108,7 +112,12 @@ export default function ActivityLogPage() {
     }
   };
 
-  useEffect(() => { load(actionFilter); }, [actionFilter]);
+  useEffect(() => { load(actionFilter, page); }, [actionFilter, page]);
+
+  const selectFilter = (a: string) => {
+    setActionFilter(a);
+    setPage(1); // a new filter starts at its first page
+  };
 
   return (
     <div>
@@ -119,14 +128,14 @@ export default function ActivityLogPage() {
             Every action taken on every appointment — bookings, confirmations, completions, no-shows, cancellations.
           </p>
         </div>
-        <button onClick={() => load(actionFilter)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-100">Refresh</button>
+        <button onClick={() => load(actionFilter, page)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-100">Refresh</button>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
         {ACTION_FILTERS.map((a) => (
           <button
             key={a || "all"}
-            onClick={() => setActionFilter(a)}
+            onClick={() => selectFilter(a)}
             className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
               actionFilter === a
                 ? "bg-indigo-600 text-white"
@@ -196,6 +205,8 @@ export default function ActivityLogPage() {
           })}
         </div>
       )}
+
+      <Pager pagination={pagination} onPage={setPage} />
     </div>
   );
 }

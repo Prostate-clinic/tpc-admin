@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { nestApi, AppointmentStatus } from "@/lib/nest-api";
+import { nestApi, AppointmentStatus, PaginationMeta } from "@/lib/nest-api";
+import Pager from "@/components/Pager";
 
 type Appointment = {
   id: string;
@@ -65,8 +66,10 @@ const TABS: { label: string; statuses?: AppointmentStatus[] }[] = [
 export default function BookedAppointmentsPage() {
   const { user } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [pagination, setPagination] = useState<PaginationMeta | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState(0);
+  const [page, setPage] = useState(1);
 
   const load = async () => {
     setLoading(true);
@@ -74,13 +77,19 @@ export default function BookedAppointmentsPage() {
       const statuses = TABS[tab].statuses;
       const res =
         user?.role === "DOCTOR"
-          ? await nestApi.getMyAppointments(statuses)
-          : await nestApi.getAppointments(statuses);
+          ? await nestApi.getMyAppointments(statuses, page)
+          : await nestApi.getAppointments(statuses, page);
       setAppointments(res.appointments as Appointment[]);
+      setPagination(res.pagination);
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); }, [user, tab]);
+  useEffect(() => { load(); }, [user, tab, page]);
+
+  const selectTab = (i: number) => {
+    setTab(i);
+    setPage(1); // a new filter starts at its first page
+  };
 
   const confirmAppointment = async (id: string) => {
     if (!confirm("Confirm this appointment?")) return;
@@ -136,7 +145,9 @@ export default function BookedAppointmentsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Booked Appointments</h1>
-          <p className="mt-1 text-sm text-slate-500">{appointments.length} appointment{appointments.length === 1 ? "" : "s"} · {TABS[tab].label.toLowerCase()}</p>
+          <p className="mt-1 text-sm text-slate-500">
+            {pagination ? pagination.total : appointments.length} appointment{(pagination?.total ?? appointments.length) === 1 ? "" : "s"} · {TABS[tab].label.toLowerCase()}
+          </p>
         </div>
         <button onClick={load} className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-100">Refresh</button>
       </div>
@@ -145,7 +156,7 @@ export default function BookedAppointmentsPage() {
         {TABS.map((t, i) => (
           <button
             key={t.label}
-            onClick={() => setTab(i)}
+            onClick={() => selectTab(i)}
             className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
               tab === i
                 ? "bg-indigo-600 text-white"
@@ -251,6 +262,8 @@ export default function BookedAppointmentsPage() {
           })}
         </div>
       )}
+
+      <Pager pagination={pagination} onPage={setPage} />
     </div>
   );
 }

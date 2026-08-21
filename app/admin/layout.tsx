@@ -137,7 +137,7 @@ function AdminShell({ children }: { children: React.ReactNode }) {
       <aside className={`fixed inset-y-0 left-0 z-40 w-64 transform border-r border-slate-200 bg-white transition-transform lg:static lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="flex h-16 items-center justify-between border-b border-slate-200 px-5">
           <Link href="/admin" className="text-lg font-bold text-[#1a1aaa]">
-            <Image src="/logo.png" alt="IMO Clinic" width={80} height={80} className="inline-block" />
+            <Image src="/logo.png" alt="Imo Robotic Surgery and Oncology Center" width={80} height={80} className="inline-block" />
           </Link>
           <button onClick={() => setSidebarOpen(false)} className="lg:hidden"><X className="h-5 w-5" /></button>
         </div>
