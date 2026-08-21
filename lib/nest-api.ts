@@ -286,6 +286,22 @@ export const nestApi = {
   },
 
   /**
+   * The clinic-wide audit feed. Every action on every appointment — who did
+   * what, when, and to which booking. Admin only.
+   */
+  getActivityLog(filters?: { action?: string; actorType?: string; take?: number }) {
+    const query = new URLSearchParams(
+      Object.entries(filters ?? {}).filter(([, v]) => v !== undefined && v !== "") as [
+        string,
+        string,
+      ][],
+    ).toString();
+    return request<{ entries: unknown[] }>(`/appointments/activity${query ? `?${query}` : ""}`, {
+      method: "GET",
+    });
+  },
+
+  /**
    * Moves an appointment through the clinical lifecycle. The backend enforces a
    * transition table, so an illegal move (e.g. re-opening a COMPLETED
    * appointment) comes back as a 409 rather than silently corrupting state.

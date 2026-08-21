@@ -62,6 +62,7 @@ const navItems: Record<string, NavItem[]> = {
     { href: "/admin/profile", label: "Profile", icon: User },
     { href: "/admin/appointments", label: "Booked Appointments", icon: CalendarDays },
     { href: "/admin/appointments/closed", label: "Closed Appointments", icon: ClipboardCheck },
+    { href: "/admin/appointments/activity", label: "Activity Log", icon: Eye },
     { href: "/admin/payments", label: "Payments", icon: CreditCard },
     { href: "/admin/slots", label: "Manage Slots", icon: Clock },
     {
