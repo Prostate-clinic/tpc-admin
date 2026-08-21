@@ -29,20 +29,49 @@ const fmtTime = (iso: string) =>
     hour: "2-digit", minute: "2-digit", hour12: false, timeZone: CLINIC_TZ,
   });
 
+const STATUS_STYLES: Record<string, string> = {
+  PENDING: "bg-amber-100 text-amber-700",
+  CONFIRMED: "bg-indigo-100 text-indigo-700",
+  CHECKED_IN: "bg-sky-100 text-sky-700",
+  IN_PROGRESS: "bg-violet-100 text-violet-700",
+};
+
 export default function BookedAppointmentsPage() {
   const { user } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // A patient booking is created PENDING (a 30-minute payment hold) and only
+  // becomes CONFIRMED once payment or staff approval lands. Filtering to
+  // CONFIRMED alone hid every fresh booking from this page — so show the whole
+  // active lifecycle instead.
+  const ACTIVE_STATUSES = ["PENDING", "CONFIRMED", "CHECKED_IN", "IN_PROGRESS"] as const;
+
   const load = async () => {
     setLoading(true);
     try {
-      const res = user?.role === "DOCTOR" ? await nestApi.getMyAppointments("CONFIRMED") : await nestApi.getAppointments("CONFIRMED");
+      const res =
+        user?.role === "DOCTOR"
+          ? await nestApi.getMyAppointments([...ACTIVE_STATUSES])
+          : await nestApi.getAppointments([...ACTIVE_STATUSES]);
       setAppointments(res.appointments as Appointment[]);
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
   useEffect(() => { load(); }, [user]);
+
+  const confirmAppointment = async (id: string) => {
+    if (!confirm("Confirm this appointment?")) return;
+    try {
+      await nestApi.confirmAppointment(id);
+      setAppointments((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, status: "CONFIRMED" } : a)),
+      );
+    } catch (e) {
+      console.error(e);
+      alert(e instanceof Error ? e.message : "Could not confirm appointment");
+    }
+  };
 
   // "Close" is now COMPLETED — the consultation happened. A patient who never
   // turned up is NO_SHOW, which the old single CLOSED status silently lost.
@@ -91,7 +120,7 @@ export default function BookedAppointmentsPage() {
                   <p className="font-semibold text-slate-900">{apt.patient.name}</p>
                   <p className="text-xs text-slate-500">{apt.patient.email} {apt.patient.phone ? `· ${apt.patient.phone}` : ""}</p>
                 </div>
-                <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700">{apt.status}</span>
+                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUS_STYLES[apt.status] ?? "bg-slate-100 text-slate-700"}`}>{apt.status}</span>
               </div>
               <div className="mt-3 grid gap-2 text-sm text-slate-600 sm:grid-cols-3">
                 <div>
@@ -115,14 +144,24 @@ export default function BookedAppointmentsPage() {
                 </span>
               )}
               <div className="mt-3 flex justify-end gap-2">
-                <button onClick={() => markNoShow(apt.id)}
-                  className="rounded-full border border-amber-200 px-3 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50">
-                  No Show
-                </button>
-                <button onClick={() => completeAppointment(apt.id)}
-                  className="rounded-full border border-emerald-200 px-3 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50">
-                  Mark Completed
-                </button>
+                {apt.status === "PENDING" && (
+                  <button onClick={() => confirmAppointment(apt.id)}
+                    className="rounded-full border border-indigo-200 px-3 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-50">
+                    Confirm
+                  </button>
+                )}
+                {apt.status === "CONFIRMED" && (
+                  <button onClick={() => markNoShow(apt.id)}
+                    className="rounded-full border border-amber-200 px-3 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50">
+                    No Show
+                  </button>
+                )}
+                {(apt.status === "CONFIRMED" || apt.status === "CHECKED_IN" || apt.status === "IN_PROGRESS") && (
+                  <button onClick={() => completeAppointment(apt.id)}
+                    className="rounded-full border border-emerald-200 px-3 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50">
+                    Mark Completed
+                  </button>
+                )}
               </div>
             </div>
           ))}

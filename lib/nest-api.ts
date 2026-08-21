@@ -248,16 +248,40 @@ export const nestApi = {
     });
   },
 
-  getAppointments(status?: AppointmentStatus) {
-    const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  /**
+   * `status` accepts one status or a list (sent comma-separated). A fresh
+   * patient booking is PENDING until payment or staff confirmation, so pass the
+   * active statuses to see bookings that still need attention.
+   */
+  getAppointments(status?: AppointmentStatus | AppointmentStatus[]) {
+    const query = status
+      ? `?status=${(Array.isArray(status) ? status : [status])
+          .map((s) => encodeURIComponent(s))
+          .join(",")}`
+      : "";
     return request<{ appointments: unknown[] }>(`/appointments${query}`, { method: "GET" });
   },
 
   /** The signed-in doctor's own appointments. */
-  getMyAppointments(status?: AppointmentStatus) {
-    const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  getMyAppointments(status?: AppointmentStatus | AppointmentStatus[]) {
+    const query = status
+      ? `?status=${(Array.isArray(status) ? status : [status])
+          .map((s) => encodeURIComponent(s))
+          .join(",")}`
+      : "";
     return request<{ appointments: unknown[] }>(`/appointments/my-schedule${query}`, {
       method: "GET",
+    });
+  },
+
+  /**
+   * PENDING → CONFIRMED. A new booking holds its slot for only 30 minutes;
+   * confirming it (once payment is settled) turns the hold into a commitment.
+   */
+  confirmAppointment(id: string, paymentReference?: string) {
+    return request<{ appointment: unknown }>(`/appointments/${id}/confirm`, {
+      method: "POST",
+      body: paymentReference ? { paymentReference } : {},
     });
   },
 
