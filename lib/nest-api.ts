@@ -6,6 +6,7 @@ export type StaffUser = {
   email: string;
   role: StaffRole;
   doctorId?: string;
+  image?: string | null;
   isFirstLogin?: boolean;
 };
 

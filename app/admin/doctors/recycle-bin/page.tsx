@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { type DoctorAdminRecord, nestApi } from "@/lib/nest-api";
-import Image from "next/image";
+import Avatar from "@/components/Avatar";
 
 export default function RecycleBinPage() {
     const { user } = useAuth();
@@ -66,11 +66,7 @@ export default function RecycleBinPage() {
                         {sortedDoctors.map((doctor) => (
                             <div key={doctor.id} className="rounded-xl border border-slate-200 px-4 py-3 smooth-card opacity-80">
                                 <div className="flex flex-wrap items-center gap-3">
-                                    {doctor.image && (
-                                        <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-slate-200">
-                                            <Image src={doctor.image} alt={doctor.name} fill className="object-cover" />
-                                        </div>
-                                    )}
+                                    <Avatar src={doctor.image} name={doctor.name} size={40} />
                                     <div className="flex-1">
                                         <div className="flex flex-wrap items-center gap-2">
                                             <p className="font-semibold text-slate-700">{doctor.name}</p>

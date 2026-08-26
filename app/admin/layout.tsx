@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import Avatar from "@/components/Avatar";
 
 type NavItem = {
   href: string;
@@ -195,9 +196,12 @@ function AdminShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
         <div className="absolute bottom-0 left-0 right-0 border-t border-slate-200 p-4">
-          <div className="mb-3 px-3">
-            <p className="text-sm font-semibold text-slate-900">{user.name}</p>
-            <p className="text-xs text-slate-500 capitalize">{user.role.toLowerCase()}</p>
+          <div className="mb-3 flex items-center gap-3 px-3">
+            <Avatar src={user.image} name={user.name} size={40} />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-slate-900">{user.name}</p>
+              <p className="truncate text-xs text-slate-500 capitalize">{user.role.toLowerCase()}</p>
+            </div>
           </div>
           <button onClick={logout} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50">
             <LogOut className="h-4 w-4" /> Sign Out
@@ -206,8 +210,12 @@ function AdminShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="flex-1">
-        <header className="sticky top-0 z-30 flex h-16 items-center border-b border-slate-200 bg-white/90 px-5 backdrop-blur">
+        <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between lg:justify-end border-b border-slate-200 bg-white/90 px-5 backdrop-blur">
           <button onClick={() => setSidebarOpen(true)} className="lg:hidden"><Menu className="h-5 w-5" /></button>
+          <div className="flex items-center gap-3">
+            <span className="hidden text-sm text-slate-600 sm:block">{user.name}</span>
+            <Avatar src={user.image} name={user.name} size={36} />
+          </div>
         </header>
         <main className="p-5 lg:p-8">{children}</main>
       </div>

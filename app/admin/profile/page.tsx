@@ -1,12 +1,13 @@
 "use client";
 
-import Image from "next/image";
+import { Camera, Check, Loader2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { nestApi } from "@/lib/nest-api";
+import Avatar from "@/components/Avatar";
 
 export default function ProfilePage() {
-  const { user, changePassword } = useAuth();
+  const { user, changePassword, refresh } = useAuth();
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -15,8 +16,6 @@ export default function ProfilePage() {
   const [passwordSuccess, setPasswordSuccess] = useState("");
   const [updatingPassword, setUpdatingPassword] = useState(false);
 
-  const [profileImage, setProfileImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageError, setImageError] = useState("");
   const [imageSuccess, setImageSuccess] = useState("");
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -63,43 +62,22 @@ export default function ProfilePage() {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;
-    setProfileImage(file);
-    if (file) {
-      const url = URL.createObjectURL(file);
-      setImagePreview(url);
-    } else {
-      setImagePreview(null);
-    }
-  };
+    if (!file || !isDoctor) return;
 
-  const handleImageUpload = async (e: React.FormEvent) => {
-    e.preventDefault();
     setImageError("");
     setImageSuccess("");
-
-    if (!isDoctor) {
-      setImageError("Backend currently allows display-picture update for doctors only.");
-      return;
-    }
-
-    if (!profileImage) {
-      setImageError("Please select an image before uploading.");
-      return;
-    }
-
     setUploadingImage(true);
     try {
-      await nestApi.updateDoctorDisplayPicture(profileImage);
-      setImageSuccess("Profile image updated successfully.");
-      setProfileImage(null);
-      setImagePreview(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      await nestApi.updateDoctorDisplayPicture(file);
+      setImageSuccess("Profile image updated.");
+      await refresh();
     } catch (err) {
       setImageError(err instanceof Error ? err.message : "Failed to update profile image");
     } finally {
       setUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -107,6 +85,44 @@ export default function ProfilePage() {
     <div>
       <h1 className="text-2xl font-bold text-slate-900">Profile</h1>
       <p className="mt-1 text-sm text-slate-500">Manage your account settings.</p>
+
+      {imageError && <div className="mt-4 rounded-xl bg-red-50 px-4 py-2 text-sm text-red-700">{imageError}</div>}
+      {imageSuccess && <div className="mt-4 rounded-xl bg-emerald-50 px-4 py-2 text-sm text-emerald-700">{imageSuccess}</div>}
+
+      <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5">
+        <div className="flex items-center gap-4">
+          {isDoctor ? (
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="group relative shrink-0"
+              disabled={uploadingImage}
+            >
+              <Avatar src={user?.image} name={user?.name || "User"} size={72} />
+              <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
+                {uploadingImage ? (
+                  <Loader2 className="h-5 w-5 text-white animate-spin" />
+                ) : (
+                  <Camera className="h-5 w-5 text-white" />
+                )}
+              </div>
+            </button>
+          ) : (
+            <Avatar src={user?.image} name={user?.name || "User"} size={72} />
+          )}
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">{user?.name}</h2>
+            <p className="text-sm text-slate-500">{user?.email}</p>
+            <p className="mt-1 text-xs font-medium text-indigo-600 capitalize">{user?.role?.toLowerCase()}</p>
+          </div>
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileChange}
+          className="hidden"
+        />
+      </div>
 
       <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5">
         <h2 className="text-base font-semibold text-slate-900">Account Information</h2>
@@ -132,7 +148,6 @@ export default function ProfilePage() {
 
       <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5">
         <h2 className="text-base font-semibold text-slate-900">Change Password</h2>
-        <p className="mt-1 text-xs text-slate-500">Endpoint support in current backend docs: doctors only.</p>
 
         <form onSubmit={handlePasswordSubmit} className="mt-4 space-y-4">
           {passwordError && <div className="rounded-xl bg-red-50 px-4 py-2 text-sm text-red-700">{passwordError}</div>}
@@ -177,63 +192,6 @@ export default function ProfilePage() {
             className="rounded-full bg-[#1a1aaa] px-5 py-2 text-sm font-semibold text-white hover:bg-[#111188] disabled:opacity-60"
           >
             {updatingPassword ? "Updating..." : "Change Password"}
-          </button>
-        </form>
-      </div>
-
-      <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5">
-        <h2 className="text-base font-semibold text-slate-900">Profile Image</h2>
-        <p className="mt-1 text-xs text-slate-500">Endpoint support in current backend docs: doctors only.</p>
-
-        <form onSubmit={handleImageUpload} className="mt-4">
-          {imageError && <div className="mb-3 rounded-xl bg-red-50 px-4 py-2 text-sm text-red-700">{imageError}</div>}
-          {imageSuccess && <div className="mb-3 rounded-xl bg-emerald-50 px-4 py-2 text-sm text-emerald-700">{imageSuccess}</div>}
-
-          <div className="flex items-start gap-4">
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              className="relative flex h-24 w-24 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 transition hover:border-indigo-400 hover:bg-indigo-50"
-            >
-              {imagePreview ? (
-                <Image src={imagePreview} alt="Preview" fill className="object-cover" />
-              ) : (
-                <span className="text-xs text-slate-400 text-center px-2">Click to upload</span>
-              )}
-            </div>
-            <div className="flex-1">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-              <p className="text-xs text-slate-500">Accepted formats: JPG, PNG, WEBP.</p>
-              {profileImage && (
-                <div className="mt-2 flex items-center gap-2">
-                  <span className="max-w-[240px] truncate text-xs font-medium text-slate-700">{profileImage.name}</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setProfileImage(null);
-                      setImagePreview(null);
-                      if (fileInputRef.current) fileInputRef.current.value = "";
-                    }}
-                    className="text-xs text-red-500 hover:underline"
-                  >
-                    Remove
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={uploadingImage}
-            className="mt-4 rounded-full bg-[#1a1aaa] px-5 py-2 text-sm font-semibold text-white hover:bg-[#111188] disabled:opacity-60"
-          >
-            {uploadingImage ? "Uploading..." : "Update Profile Image"}
           </button>
         </form>
       </div>
