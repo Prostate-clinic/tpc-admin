@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { AlertCircle, Loader2, ArrowRight } from "lucide-react";
 import Image from "next/image";
+import PasswordInput from "@/components/PasswordInput";
 
 export default function ChangePasswordPage() {
   const { user, changePassword } = useAuth();
@@ -45,7 +46,7 @@ export default function ChangePasswordPage() {
               { label: "Confirm New Password", val: confirmPassword, set: setConfirmPassword }].map((f) => (
               <div key={f.label}>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">{f.label}</label>
-                <input type="password" value={f.val} onChange={(e) => f.set(e.target.value)} required
+                <PasswordInput value={f.val} onChange={(e) => f.set(e.target.value)} required
                   className="h-11 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-900 outline-none ring-4 ring-indigo-100 transition-all focus:border-indigo-500 focus:ring-indigo-100" />
               </div>
             ))}

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Shield, ArrowRight, Mail, Lock } from "lucide-react";
 import Image from "next/image";
+import PasswordInput from "@/components/PasswordInput";
 
 function LoginForm() {
   const [email, setEmail] = useState("");
@@ -122,12 +123,11 @@ function LoginForm() {
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Password</label>
               <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="password"
+                <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 z-10" />
+                <PasswordInput
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="h-11 w-full rounded-xl border border-slate-300 bg-white pl-10 pr-4 text-sm text-slate-900 outline-none ring-4 ring-indigo-100 transition-all placeholder:text-slate-400 focus:border-indigo-500 focus:ring-indigo-100"
+                  className="h-11 w-full rounded-xl border border-slate-300 bg-white pl-10 text-sm text-slate-900 outline-none ring-4 ring-indigo-100 transition-all placeholder:text-slate-400 focus:border-indigo-500 focus:ring-indigo-100"
                   placeholder="Enter your password"
                   required
                 />

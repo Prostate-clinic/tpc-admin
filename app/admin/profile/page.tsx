@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { nestApi } from "@/lib/nest-api";
 import Avatar from "@/components/Avatar";
+import PasswordInput from "@/components/PasswordInput";
 
 export default function ProfilePage() {
   const { user, changePassword, refresh } = useAuth();
@@ -97,7 +98,7 @@ export default function ProfilePage() {
             { label: "Confirm New Password", value: confirmPassword, set: setConfirmPassword }].map((f) => (
             <div key={f.label}>
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">{f.label}</label>
-              <input type="password" value={f.value} onChange={(e) => f.set(e.target.value)}
+              <PasswordInput value={f.value} onChange={(e) => f.set(e.target.value)}
                 className="h-11 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-900 outline-none ring-4 ring-indigo-100 transition-all focus:border-indigo-500 focus:ring-indigo-100" required />
             </div>
           ))}
