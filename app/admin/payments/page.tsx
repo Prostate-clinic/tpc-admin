@@ -7,9 +7,17 @@ import { TrendingUp, AlertCircle } from "lucide-react";
 type Payment = {
   id: string; amount: string; status: string; createdAt: string;
   appointment: {
-    date: string; patient: { name: string; email: string | null };
-    doctor: { name: string }; service: { name: string };
+    date: string | null; patient: { name: string; email: string | null } | null;
+    doctor: { name: string } | null; service: { name: string } | null;
   };
+};
+
+const fmtDate = (v: string | null) => {
+  if (!v) return "—";
+  try {
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? v : d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  } catch { return v; }
 };
 
 export default function PaymentsPage() {
@@ -74,7 +82,7 @@ export default function PaymentsPage() {
                   </td>
                   <td className="px-5 py-3 text-slate-600">{p.appointment.service?.name ?? "—"}</td>
                   <td className="px-5 py-3 text-slate-600">{p.appointment.doctor?.name ?? "—"}</td>
-                  <td className="px-5 py-3 text-slate-600">{new Date(p.appointment.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</td>
+                  <td className="px-5 py-3 text-slate-600">{fmtDate(p.appointment.date)}</td>
                   <td className="px-5 py-3 text-right font-semibold text-slate-900">₦{Number(p.amount).toLocaleString()}</td>
                   <td className="px-5 py-3 text-right">
                     <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">{p.status}</span>
