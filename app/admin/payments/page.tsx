@@ -69,11 +69,11 @@ export default function PaymentsPage() {
               {payments.map((p) => (
                 <tr key={p.id} className="transition hover:bg-slate-50">
                   <td className="px-5 py-3">
-                    <p className="font-medium text-slate-900">{p.appointment.patient.name}</p>
-                    <p className="text-xs text-slate-400">{p.appointment.patient.email}</p>
+                    <p className="font-medium text-slate-900">{p.appointment.patient?.name ?? "Guest"}</p>
+                    <p className="text-xs text-slate-400">{p.appointment.patient?.email ?? "—"}</p>
                   </td>
-                  <td className="px-5 py-3 text-slate-600">{p.appointment.service.name}</td>
-                  <td className="px-5 py-3 text-slate-600">{p.appointment.doctor.name}</td>
+                  <td className="px-5 py-3 text-slate-600">{p.appointment.service?.name ?? "—"}</td>
+                  <td className="px-5 py-3 text-slate-600">{p.appointment.doctor?.name ?? "—"}</td>
                   <td className="px-5 py-3 text-slate-600">{new Date(p.appointment.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</td>
                   <td className="px-5 py-3 text-right font-semibold text-slate-900">₦{Number(p.amount).toLocaleString()}</td>
                   <td className="px-5 py-3 text-right">
