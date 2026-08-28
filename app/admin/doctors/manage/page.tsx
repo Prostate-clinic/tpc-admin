@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { type DoctorAdminRecord, nestApi } from "@/lib/nest-api";
 import { Users, Plus, X, AlertCircle, CheckCircle, Trash2 } from "lucide-react";
 import Avatar from "@/components/Avatar";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 export default function ManageDoctorsPage() {
   const { user } = useAuth();
@@ -16,6 +17,7 @@ export default function ManageDoctorsPage() {
   const [doctors, setDoctors] = useState<DoctorAdminRecord[]>([]);
   const [accountModalDoctor, setAccountModalDoctor] = useState<DoctorAdminRecord | null>(null);
   const [accountModalEmail, setAccountModalEmail] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
 
   const nonAdmin = user && user.role !== "ADMIN";
   const sortedDoctors = useMemo(() => [...doctors].sort((a, b) => a.name.localeCompare(b.name)), [doctors]);
@@ -43,11 +45,21 @@ export default function ManageDoctorsPage() {
     finally { setCreatingAccountId(null); }
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!window.confirm(`Delete ${name}?`)) return;
-    setDeletingId(id); setError(""); setSuccess("");
-    try { await nestApi.removeDoctor(id); setSuccess(`${name} moved to recycle bin.`); setDoctors((p) => p.filter((d) => d.id !== id)); }
-    catch (e) { setError(e instanceof Error ? e.message : "Failed"); }
+  const handleDelete = (id: string, name: string) => {
+    setConfirmDelete({ id, name });
+    setError(""); setSuccess("");
+  };
+
+  const confirmDeleteNow = async () => {
+    if (!confirmDelete) return;
+    const { id, name } = confirmDelete;
+    setDeletingId(id);
+    try {
+      await nestApi.removeDoctor(id);
+      setSuccess(`${name} moved to recycle bin.`);
+      setDoctors((p) => p.filter((d) => d.id !== id));
+      setConfirmDelete(null);
+    } catch (e) { setError(e instanceof Error ? e.message : "Failed"); }
     finally { setDeletingId(null); }
   };
 
@@ -140,6 +152,25 @@ export default function ManageDoctorsPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        title="Delete doctor"
+        message={
+          confirmDelete ? (
+            <p>
+              Delete <span className="font-semibold text-slate-900">{confirmDelete.name}</span>? Their account and
+              schedule will be moved to the recycle bin.
+            </p>
+          ) : undefined
+        }
+        confirmLabel="Delete"
+        cancelLabel="Keep"
+        danger
+        busy={deletingId === confirmDelete?.id}
+        onConfirm={confirmDeleteNow}
+        onClose={() => setConfirmDelete(null)}
+      />
     </>
   );
 }

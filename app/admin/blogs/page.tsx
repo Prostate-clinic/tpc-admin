@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import Toast from "@/components/Toast";
 
 export default function AllBlogsPage() {
   const { user } = useAuth();
@@ -26,6 +28,10 @@ export default function AllBlogsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionId, setActionId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [actionError, setActionError] = useState("");
+  const [toast, setToast] = useState<string | null>(null);
 
   const isAdmin = user?.role === "ADMIN";
 
@@ -48,15 +54,18 @@ export default function AllBlogsPage() {
     load(1);
   }, []);
 
-  async function handleDelete(id: string) {
-    if (!confirm("Delete this blog post? This cannot be undone.")) return;
+  async function confirmDelete(id: string) {
+    setActionBusy(true);
+    setActionError("");
     setActionId(id);
     try {
       await nestApi.deleteBlog(id);
       setBlogs((prev) => prev.filter((b) => b.id !== id));
+      setConfirmDeleteId(null);
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Delete failed");
+      setActionError(e instanceof Error ? e.message : "Delete failed");
     } finally {
+      setActionBusy(false);
       setActionId(null);
     }
   }
@@ -67,7 +76,7 @@ export default function AllBlogsPage() {
       const data = await nestApi.toggleBlogStatus(id);
       setBlogs((prev) => prev.map((b) => (b.id === id ? data.blog : b)));
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Toggle failed");
+      setToast(e instanceof Error ? e.message : "Toggle failed");
     } finally {
       setActionId(null);
     }
@@ -183,7 +192,7 @@ export default function AllBlogsPage() {
                   )}
                   {(isAdmin || isOwn) && (
                     <button
-                      onClick={() => handleDelete(blog.id)}
+                      onClick={() => setConfirmDeleteId(blog.id)}
                       disabled={busy}
                       title="Delete post"
                       className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-100 disabled:opacity-50"
@@ -269,26 +278,43 @@ function PublishOwnButton({
   onDone: (b: BlogPost) => void;
 }) {
   const [busy, setBusy] = useState(false);
-  async function handle() {
-    if (!confirm("Publish this post?")) return;
+  const [open, setOpen] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function publish() {
     setBusy(true);
+    setErr("");
     try {
       const data = await nestApi.updateBlogStatus(blogId, "PUBLISHED");
       onDone(data.blog);
+      setOpen(false);
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Failed to publish");
+      setErr(e instanceof Error ? e.message : "Failed to publish");
     } finally {
       setBusy(false);
     }
   }
+
   return (
-    <button
-      onClick={handle}
-      disabled={busy}
-      className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-green-200 bg-green-50 py-1.5 text-xs font-medium text-green-700 transition hover:bg-green-100 disabled:opacity-50"
-    >
-      <Globe className="h-3.5 w-3.5" />
-      Publish
-    </button>
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        disabled={busy}
+        className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-green-200 bg-green-50 py-1.5 text-xs font-medium text-green-700 transition hover:bg-green-100 disabled:opacity-50"
+      >
+        <Globe className="h-3.5 w-3.5" />
+        Publish
+      </button>
+      <ConfirmDialog
+        open={open}
+        title="Publish this post?"
+        message="It will become visible on the public site."
+        confirmLabel="Publish"
+        busy={busy}
+        error={err}
+        onConfirm={publish}
+        onClose={() => !busy && setOpen(false)}
+      />
+    </>
   );
 }

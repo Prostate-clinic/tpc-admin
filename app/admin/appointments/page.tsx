@@ -97,6 +97,12 @@ export default function BookedAppointmentsPage() {
   const [selected, setSelected] = useState<Detail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
+  const [dialog, setDialog] = useState<ActionDialog>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [actionBusy, setActionBusy] = useState(false);
+  const [actionError, setActionError] = useState("");
+  const [toast, setToast] = useState<string | null>(null);
+
   const load = async () => {
     setLoading(true);
     setError(null);
@@ -137,7 +143,7 @@ export default function BookedAppointmentsPage() {
       const res = await nestApi.getAppointment(id);
       setSelected(res.appointment as Detail);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Could not load appointment detail");
+      setToast(e instanceof Error ? e.message : "Could not load appointment detail");
     } finally {
       setDetailLoading(false);
     }
@@ -150,41 +156,65 @@ export default function BookedAppointmentsPage() {
       setSelected(res.appointment as Detail);
       await load();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Could not reload");
+      setToast(e instanceof Error ? e.message : "Could not reload");
+    }
+  };
+
+  const runAction = async (action: () => Promise<void>, fallback: string) => {
+    setActionBusy(true);
+    setActionError("");
+    try {
+      await action();
+      setDialog(null);
+      setCancelReason("");
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : fallback);
+    } finally {
+      setActionBusy(false);
     }
   };
 
   const confirmed = async (id: string) => {
-    if (!confirm("Confirm this appointment?")) return;
-    try { await nestApi.confirmAppointment(id); await reloadDetail(); }
-    catch (e) { alert(e instanceof Error ? e.message : "Could not confirm"); }
+    await runAction(async () => {
+      await nestApi.confirmAppointment(id);
+      await reloadDetail();
+    }, "Could not confirm");
   };
 
   const cancelOne = async (id: string) => {
-    const reason = prompt("Reason for cancelling:");
-    if (reason === null) return;
-    try { await nestApi.cancelAppointment(id, reason || undefined, true); await reloadDetail(); }
-    catch (e) { alert(e instanceof Error ? e.message : "Could not cancel"); }
+    await runAction(async () => {
+      await nestApi.cancelAppointment(id, cancelReason.trim() || undefined, true);
+      await reloadDetail();
+    }, "Could not cancel");
   };
 
   const completeOne = async (id: string) => {
-    if (!confirm("Mark as completed?")) return;
-    try { await nestApi.updateAppointmentStatus(id, "COMPLETED"); await reloadDetail(); }
-    catch (e) { alert(e instanceof Error ? e.message : "Could not complete"); }
+    await runAction(async () => {
+      await nestApi.updateAppointmentStatus(id, "COMPLETED");
+      await reloadDetail();
+    }, "Could not complete");
   };
 
   const markNoShow = async (id: string) => {
-    if (!confirm("Mark as no-show?")) return;
-    try { await nestApi.updateAppointmentStatus(id, "NO_SHOW"); await reloadDetail(); }
-    catch (e) { alert(e instanceof Error ? e.message : "Could not mark no-show"); }
+    await runAction(async () => {
+      await nestApi.updateAppointmentStatus(id, "NO_SHOW");
+      await reloadDetail();
+    }, "Could not mark no-show");
   };
 
   const assignDoc = async (doctorId: string) => {
     if (!selected || !doctorId) return;
     setAssigning(true);
     try { await nestApi.assignDoctor(selected.id, doctorId); await reloadDetail(); }
-    catch (e) { alert(e instanceof Error ? `Could not assign: ${e.message}` : "Could not assign doctor"); }
+    catch (e) { setToast(e instanceof Error ? `Could not assign: ${e.message}` : "Could not assign doctor"); }
     finally { setAssigning(false); }
+  };
+
+  const closeDialog = () => {
+    if (actionBusy) return;
+    setDialog(null);
+    setActionError("");
+    setCancelReason("");
   };
 
   return (
@@ -382,23 +412,74 @@ export default function BookedAppointmentsPage() {
             <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 px-6 py-4">
               {selected.status === "PENDING" && (
                 <>
-                  {/* <button onClick={() => cancelOne(selected.id)} className="rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50">Cancel</button> */}
-                  <button onClick={() => confirmed(selected.id)} className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-md shadow-indigo-200 transition hover:bg-indigo-700">Confirm</button>
+                  {/* <button onClick={() => setDialog({ kind: "cancel", id: selected.id })} className="rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50">Cancel</button> */}
+                  <button onClick={() => setDialog({ kind: "confirm", id: selected.id })} className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-md shadow-indigo-200 transition hover:bg-indigo-700">Confirm</button>
                 </>
               )}
               {selected.status === "CONFIRMED" && selected.doctor && (
                 <>
-                  <button onClick={() => cancelOne(selected.id)} className="rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50">Cancel</button>
-                  <button onClick={() => markNoShow(selected.id)} className="rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-semibold text-amber-600 transition hover:bg-amber-50">No Show</button>
+                  <button onClick={() => setDialog({ kind: "cancel", id: selected.id })} className="rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50">Cancel</button>
+                  <button onClick={() => setDialog({ kind: "noshow", id: selected.id })} className="rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-semibold text-amber-600 transition hover:bg-amber-50">No Show</button>
                 </>
               )}
               {(selected.status === "CONFIRMED" || selected.status === "CHECKED_IN" || selected.status === "IN_PROGRESS") && (
-                <button onClick={() => completeOne(selected.id)} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-md shadow-emerald-200 transition hover:bg-emerald-700">Mark completed</button>
+                <button onClick={() => setDialog({ kind: "complete", id: selected.id })} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-md shadow-emerald-200 transition hover:bg-emerald-700">Mark completed</button>
               )}
             </div>
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={dialog !== null}
+        title={
+          dialog?.kind === "confirm"
+            ? "Confirm appointment"
+            : dialog?.kind === "cancel"
+              ? "Cancel appointment"
+              : dialog?.kind === "complete"
+                ? "Mark appointment completed"
+                : dialog?.kind === "noshow"
+                  ? "Mark as no-show"
+                  : ""
+        }
+        message={
+          selected ? (
+            <p>
+              <span className="font-semibold text-slate-900">{selected.patient?.name ?? selected.contactName}</span>
+              <span className="font-mono text-xs text-slate-500"> · {selected.referenceNumber}</span>
+            </p>
+          ) : undefined
+        }
+        confirmLabel={
+          dialog?.kind === "confirm"
+            ? "Confirm"
+            : dialog?.kind === "cancel"
+              ? "Cancel appointment"
+              : dialog?.kind === "complete"
+                ? "Mark completed"
+                : dialog?.kind === "noshow"
+                  ? "Mark no-show"
+                  : "Confirm"
+        }
+        danger={dialog?.kind === "cancel" || dialog?.kind === "noshow"}
+        busy={actionBusy}
+        inputLabel={dialog?.kind === "cancel" ? "Reason (optional)" : undefined}
+        inputPlaceholder={dialog?.kind === "cancel" ? "Let the clinic know why" : undefined}
+        inputValue={cancelReason}
+        onInputChange={setCancelReason}
+        error={actionError}
+        onConfirm={() => {
+          if (!dialog) return;
+          if (dialog.kind === "confirm") void confirmed(dialog.id);
+          else if (dialog.kind === "cancel") void cancelOne(dialog.id);
+          else if (dialog.kind === "complete") void completeOne(dialog.id);
+          else if (dialog.kind === "noshow") void markNoShow(dialog.id);
+        }}
+        onClose={closeDialog}
+      />
+
+      <Toast message={toast} onDismiss={() => setToast(null)} />
     </div>
   );
 }
