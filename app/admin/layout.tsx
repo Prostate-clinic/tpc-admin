@@ -37,14 +37,12 @@ type NavItem = {
 const navItems: Record<string, NavItem[]> = {
   FRONTDESK: [
     { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/admin/profile", label: "Profile", icon: User },
     { href: "/admin/appointments", label: "Appointments", icon: CalendarDays },
     { href: "/admin/appointments/closed", label: "Closed", icon: ClipboardCheck },
     { href: "/admin/payments", label: "Payments", icon: CreditCard },
   ],
   DOCTOR: [
     { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/admin/profile", label: "Profile", icon: User },
     { href: "/admin/appointments", label: "Appointments", icon: CalendarDays },
     { href: "/admin/slots", label: "My Schedule", icon: Clock },
     {
@@ -60,7 +58,6 @@ const navItems: Record<string, NavItem[]> = {
   ],
   ADMIN: [
     { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/admin/profile", label: "Profile", icon: User },
     { href: "/admin/appointments", label: "Appointments", icon: CalendarDays },
     { href: "/admin/appointments/closed", label: "Closed", icon: ClipboardCheck },
     { href: "/admin/appointments/activity", label: "Activity", icon: Eye },
@@ -208,13 +205,13 @@ function AdminShell({ children }: { children: React.ReactNode }) {
 
         {/* User */}
         <div className="shrink-0 border-t border-slate-100 p-3">
-          <div className="mb-2 flex items-center gap-2.5 rounded-xl px-3 py-2">
+          <Link href={'/admin/profile'} className="mb-2 flex items-center gap-2.5 rounded-xl px-3 py-2 bg-gray-100/80">
             <Avatar src={user.image} name={user.name} size={32} />
             <div className="min-w-0 flex-1">
               <p className="truncate text-[13px] font-semibold text-slate-900">{user.name}</p>
               <p className="truncate text-[11px] text-slate-400">{user.role}</p>
             </div>
-          </div>
+          </Link>
           <button onClick={logout} className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-slate-500 transition hover:bg-red-50 hover:text-red-600">
             <LogOut className="h-4 w-4" />
             Sign Out
@@ -233,10 +230,10 @@ function AdminShell({ children }: { children: React.ReactNode }) {
             <span className="text-xs font-medium text-emerald-700">Online</span>
           </div>
           <div className="h-5 w-px bg-slate-200" />
-          <div className="flex items-center gap-2">
+          <Link href={'/admin/profile'} className="flex items-center gap-2">
             <span className="hidden text-sm font-medium text-slate-700 sm:block">{user.name}</span>
             <Avatar src={user.image} name={user.name} size={32} />
-          </div>
+          </Link>
         </div>
       </header>
 

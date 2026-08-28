@@ -236,6 +236,22 @@ export const nestApi = {
     });
   },
 
+  forgotAdminPassword(email: string) {
+    return request<{ message: string }>("/auth/forgot-password", {
+      method: "POST",
+      body: { email },
+      token: null,
+    });
+  },
+
+  resetAdminPassword(email: string, otp: string, newPassword: string) {
+    return request<{ message: string }>("/auth/reset-password", {
+      method: "POST",
+      body: { email, otp, newPassword },
+      token: null,
+    });
+  },
+
   updateDoctorDisplayPicture(profileImage: File) {
     const token = getStaffToken();
     const formData = new FormData();

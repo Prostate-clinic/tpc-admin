@@ -132,6 +132,9 @@ function LoginForm() {
                   required
                 />
               </div>
+              <div className="mt-1.5 flex justify-end">
+                <a href="/forgot-password" className="text-xs font-medium text-indigo-600 hover:underline">Forgot password?</a>
+              </div>
             </div>
 
             <button
@@ -154,7 +157,7 @@ function LoginForm() {
           </form>
 
           <p className="mt-8 text-center text-xs text-slate-400">
-            Forgot your password? Contact the administrator.
+            <a href="/forgot-password" className="font-semibold text-indigo-600 hover:underline">Forgot your password?</a>
           </p>
         </div>
       </div>
