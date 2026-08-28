@@ -73,8 +73,8 @@ const STATUS_BADGE: Record<string, string> = {
 
 const TABS: TabDef[] = [
   { label: "Awaiting Payment", statuses: ["PENDING"], paymentStatus: "AWAITING" },
-  { label: "Pending (Unassigned)", statuses: ["PENDING"], assigned: "no" },
-  { label: "Pending (Assigned)", statuses: ["PENDING"], assigned: "yes" },
+  { label: "Unassigned", statuses: ["PENDING"], assigned: "no" },
+  { label: "Assigned", statuses: ["CONFIRMED", "CHECKED_IN", "IN_PROGRESS"], assigned: "yes" },
   { label: "Completed", statuses: ["COMPLETED"] },
   { label: "Cancelled", statuses: ["CANCELLED", "REJECTED", "NO_SHOW"] },
   { label: "All" },
@@ -395,8 +395,9 @@ export default function BookedAppointmentsPage() {
               {selected.status === "PENDING" && !selected.doctor && canAssign && (
                 <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
                   <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-800">
-                    <CalendarPlus className="h-4 w-4" /> Unassigned
+                    <CalendarPlus className="h-4 w-4" /> Unassigned — assign to confirm
                   </p>
+                  <p className="mt-1 text-xs text-amber-700">Choose a doctor to immediately confirm this appointment and notify the doctor.</p>
                   <select
                     value=""
                     onChange={(e) => assignDoc(e.target.value)}
@@ -410,12 +411,6 @@ export default function BookedAppointmentsPage() {
             </div>
 
             <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 px-6 py-4">
-              {selected.status === "PENDING" && (
-                <>
-                  {/* <button onClick={() => setDialog({ kind: "cancel", id: selected.id })} className="rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50">Cancel</button> */}
-                  <button onClick={() => setDialog({ kind: "confirm", id: selected.id })} className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-md shadow-indigo-200 transition hover:bg-indigo-700">Confirm</button>
-                </>
-              )}
               {selected.status === "CONFIRMED" && selected.doctor && (
                 <>
                   <button onClick={() => setDialog({ kind: "cancel", id: selected.id })} className="rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50">Cancel</button>
@@ -424,6 +419,12 @@ export default function BookedAppointmentsPage() {
               )}
               {(selected.status === "CONFIRMED" || selected.status === "CHECKED_IN" || selected.status === "IN_PROGRESS") && (
                 <button onClick={() => setDialog({ kind: "complete", id: selected.id })} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-md shadow-emerald-200 transition hover:bg-emerald-700">Mark completed</button>
+              )}
+              {selected.status === "PENDING" && selected.doctor && (
+                <button onClick={() => setDialog({ kind: "confirm", id: selected.id })} className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-md shadow-indigo-200 transition hover:bg-indigo-700">Confirm</button>
+              )}
+              {selected.status === "PENDING" && (
+                <button onClick={() => setDialog({ kind: "cancel", id: selected.id })} className="rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50">Cancel</button>
               )}
             </div>
           </div>

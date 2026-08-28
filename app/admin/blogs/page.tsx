@@ -253,6 +253,21 @@ export default function AllBlogsPage() {
           )}
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        title="Delete this post?"
+        message="This cannot be undone."
+        confirmLabel="Delete"
+        cancelLabel="Keep"
+        danger
+        busy={actionBusy}
+        error={actionError}
+        onConfirm={() => confirmDeleteId && confirmDelete(confirmDeleteId)}
+        onClose={() => !actionBusy && (setConfirmDeleteId(null), setActionError(""))}
+      />
+
+      <Toast message={toast} onDismiss={() => setToast(null)} />
     </div>
   );
 }
