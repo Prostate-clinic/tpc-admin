@@ -27,6 +27,17 @@ export type DoctorAdminRecord = {
   } | null;
 };
 
+export type Service = {
+  id: string;
+  name: string;
+  category: "SURGICAL" | "CONSULTATION" | "DIAGNOSTICS" | "IMAGING";
+  duration: number;
+  price: string;
+  description?: string | null;
+  focus: string[];
+  createdAt: string;
+};
+
 export type BlogStatus = "DRAFT" | "PUBLISHED";
 
 // ── Booking engine ─────────────────────────────────────────────────────────
@@ -502,6 +513,32 @@ export const nestApi = {
 
   getDeletedDoctors() {
     return request<{ doctors: DoctorAdminRecord[] }>("/admin/doctors/recycle-bin", { method: "GET" });
+  },
+
+  restoreDoctor(doctorId: string) {
+    return request<{ message?: string }>(`/admin/doctors/${doctorId}/restore`, {
+      method: "PATCH",
+    });
+  },
+
+  getServices() {
+    return request<{ services: Service[] }>("/services", { method: "GET" });
+  },
+
+  getService(id: string) {
+    return request<{ service: Service }>(`/services/${id}`, { method: "GET" });
+  },
+
+  createService(data: { name: string; category: Service["category"]; duration: number; price: number; description?: string; focus?: string[] }) {
+    return request<{ service: Service }>("/services", { method: "POST", body: data });
+  },
+
+  updateService(id: string, data: { name?: string; category?: Service["category"]; duration?: number; price?: number; description?: string | null; focus?: string[] }) {
+    return request<{ service: Service }>(`/services/${id}`, { method: "PATCH", body: data });
+  },
+
+  deleteService(id: string) {
+    return request<{ message?: string }>(`/services/${id}`, { method: "DELETE" });
   },
 
   // ── Blogs ────────────────────────────────────────────────────────────────

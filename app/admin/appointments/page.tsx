@@ -84,6 +84,9 @@ export default function BookedAppointmentsPage() {
   const { user } = useAuth();
   const isDoctor = user?.role === "DOCTOR";
   const canAssign = user?.role === "ADMIN" || user?.role === "FRONTDESK";
+  const visibleTabs = isDoctor
+    ? TABS.filter((t) => t.label === "Assigned" || t.label === "Completed" || t.label === "Cancelled")
+    : TABS;
 
   const [appointments, setAppointments] = useState<Brief[]>([]);
   const [pagination, setPagination] = useState<PaginationMeta | null>(null);
@@ -107,7 +110,7 @@ export default function BookedAppointmentsPage() {
     setLoading(true);
     setError(null);
     try {
-      const t = TABS[tab];
+      const t = visibleTabs[tab] ?? visibleTabs[0];
       let res: { appointments: unknown[]; pagination: PaginationMeta };
       if (isDoctor) {
         res = await nestApi.getMyAppointments(t.statuses, page);
@@ -125,6 +128,10 @@ export default function BookedAppointmentsPage() {
   };
 
   useEffect(() => {
+    if (isDoctor && tab >= visibleTabs.length) {
+      setTab(0);
+      return;
+    }
     load();
     if (canAssign) {
       nestApi.getAssignableDoctors()
@@ -132,7 +139,7 @@ export default function BookedAppointmentsPage() {
         .catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, tab, page]);
+  }, [user, tab, page, visibleTabs.length]);
 
   const selectTab = (i: number) => { setTab(i); setPage(1); };
 
@@ -223,7 +230,7 @@ export default function BookedAppointmentsPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Appointments</h1>
           <p className="mt-1 text-sm text-slate-500">
-            {pagination ? pagination.total : appointments.length} appointment{(pagination?.total ?? appointments.length) === 1 ? "" : "s"} &middot; {TABS[tab].label.toLowerCase()}
+            {pagination ? pagination.total : appointments.length} appointment{(pagination?.total ?? appointments.length) === 1 ? "" : "s"} &middot; {(visibleTabs[tab] ?? visibleTabs[0]).label.toLowerCase()}
           </p>
         </div>
         <button onClick={load} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50">
@@ -232,7 +239,7 @@ export default function BookedAppointmentsPage() {
       </div>
 
       <div className="flex flex-wrap gap-2 mb-6">
-        {TABS.map((t, i) => (
+        {visibleTabs.map((t, i) => (
           <button key={t.label} onClick={() => selectTab(i)}
             className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${tab === i ? "bg-indigo-600 text-white shadow-md shadow-indigo-200" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}>
             {t.label}
@@ -392,7 +399,7 @@ export default function BookedAppointmentsPage() {
                 </div>
               )}
 
-              {selected.status === "PENDING" && !selected.doctor && canAssign && (
+              {selected.status === "PENDING" && !selected.doctor && canAssign && selected.payment?.status === "COMPLETED" && (
                 <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
                   <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-800">
                     <CalendarPlus className="h-4 w-4" /> Unassigned — assign to confirm
@@ -408,6 +415,12 @@ export default function BookedAppointmentsPage() {
                   </select>
                 </div>
               )}
+              {selected.status === "PENDING" && !selected.doctor && selected.payment?.status !== "COMPLETED" && (
+                <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs font-semibold text-slate-600">Awaiting payment — view only</p>
+                  <p className="mt-1 text-xs text-slate-500">This appointment cannot be assigned until payment is completed.</p>
+                </div>
+              )}
             </div>
 
             <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 px-6 py-4">
@@ -420,10 +433,10 @@ export default function BookedAppointmentsPage() {
               {(selected.status === "CONFIRMED" || selected.status === "CHECKED_IN" || selected.status === "IN_PROGRESS") && (
                 <button onClick={() => setDialog({ kind: "complete", id: selected.id })} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-md shadow-emerald-200 transition hover:bg-emerald-700">Mark completed</button>
               )}
-              {selected.status === "PENDING" && selected.doctor && (
+              {selected.status === "PENDING" && selected.doctor && selected.payment?.status === "COMPLETED" && (
                 <button onClick={() => setDialog({ kind: "confirm", id: selected.id })} className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-md shadow-indigo-200 transition hover:bg-indigo-700">Confirm</button>
               )}
-              {selected.status === "PENDING" && (
+              {selected.status === "PENDING" && selected.payment?.status === "COMPLETED" && (
                 <button onClick={() => setDialog({ kind: "cancel", id: selected.id })} className="rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50">Cancel</button>
               )}
             </div>

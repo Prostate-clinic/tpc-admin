@@ -14,6 +14,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Package,
   PenLine,
   PlusCircle,
   User,
@@ -64,6 +65,7 @@ const navItems: Record<string, NavItem[]> = {
     { href: "/admin/appointments/closed", label: "Closed", icon: ClipboardCheck },
     { href: "/admin/appointments/activity", label: "Activity", icon: Eye },
     { href: "/admin/payments", label: "Payments", icon: CreditCard },
+    { href: "/admin/services", label: "Services", icon: Package },
     { href: "/admin/slots", label: "Schedule", icon: Clock },
     {
       href: "/admin/doctors",
