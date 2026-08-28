@@ -240,7 +240,7 @@ function AdminShell({ children }: { children: React.ReactNode }) {
 
       {/* Main content — offset for sidebar + header, padded */}
       <div className="min-h-screen pt-14 transition-[padding-left] duration-200 lg:pl-60">
-        <main className="p-4 lg:p-6">{children}</main>
+        <main className="">{children}</main>
       </div>
 
       {sidebarOpen && (

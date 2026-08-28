@@ -4,19 +4,20 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { nestApi, AppointmentStatus, PaginationMeta } from "@/lib/nest-api";
 import Pager from "@/components/Pager";
-import { RefreshCw, Clock, User, Stethoscope, AlertCircle } from "lucide-react";
+import {
+  RefreshCw, User, AlertCircle, ChevronRight, CalendarPlus, X,
+  Paperclip, StickyNote, CreditCard, DollarSign,
+} from "lucide-react";
 
-type Appointment = {
+type Brief = {
   id: string;
   referenceNumber: string;
+  createdAt: string;
   startAt: string;
   endAt: string;
   status: string;
-  notes: string | null;
-  cancellationReason: string | null;
-  cancelledAt: string | null;
   patient: { name: string; email: string | null; phone: string | null } | null;
-  doctor: { name: string; specialty: string };
+  doctor: { name: string; specialty: string | null } | null;
   consultationType: { name: string; durationMinutes: number };
   payment: { amount: string; status: string } | null;
   contactName: string;
@@ -24,9 +25,31 @@ type Appointment = {
   contactPhone: string | null;
 };
 
+type Detail = Brief & {
+  service: { name: string } | null;
+  medicalNoteUrl: string | null;
+  notes: string | null;
+  cancellationReason: string | null;
+  cancelledAt: string | null;
+  cancelledBy: string | null;
+  expiresAt: string | null;
+  completedAt: string | null;
+  checkedInAt: string | null;
+  startedAt: string | null;
+  branch: { name: string } | null;
+};
+
+type TabDef = {
+  label: string;
+  statuses?: AppointmentStatus[];
+  assigned?: "yes" | "no";
+  paymentStatus?: "AWAITING" | "COMPLETED" | "PENDING" | "FAILED" | "REFUNDED";
+};
+
 const CLINIC_TZ = "Africa/Lagos";
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: CLINIC_TZ });
 const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: CLINIC_TZ });
+const fmtDateShort = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: CLINIC_TZ });
 
 const STATUS_BADGE: Record<string, string> = {
   PENDING: "bg-amber-100 text-amber-700",
@@ -39,71 +62,127 @@ const STATUS_BADGE: Record<string, string> = {
   NO_SHOW: "bg-orange-100 text-orange-700",
 };
 
-const TABS: { label: string; statuses?: AppointmentStatus[] }[] = [
-  { label: "Active", statuses: ["PENDING", "CONFIRMED", "CHECKED_IN", "IN_PROGRESS"] },
-  { label: "Pending", statuses: ["PENDING"] },
-  { label: "Confirmed", statuses: ["CONFIRMED"] },
+const TABS: TabDef[] = [
+  { label: "Awaiting Payment", statuses: ["PENDING"], paymentStatus: "AWAITING" },
+  { label: "Pending (Unassigned)", statuses: ["PENDING"], assigned: "no" },
+  { label: "Pending (Assigned)", statuses: ["PENDING"], assigned: "yes" },
   { label: "Completed", statuses: ["COMPLETED"] },
-  { label: "Cancelled", statuses: ["CANCELLED"] },
-  { label: "No-shows", statuses: ["NO_SHOW"] },
-  { label: "Rejected", statuses: ["REJECTED"] },
+  { label: "Cancelled", statuses: ["CANCELLED", "REJECTED", "NO_SHOW"] },
   { label: "All" },
 ];
 
 export default function BookedAppointmentsPage() {
   const { user } = useAuth();
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const isDoctor = user?.role === "DOCTOR";
+  const canAssign = user?.role === "ADMIN" || user?.role === "FRONTDESK";
+
+  const [appointments, setAppointments] = useState<Brief[]>([]);
   const [pagination, setPagination] = useState<PaginationMeta | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState(0);
   const [page, setPage] = useState(1);
+  const [error, setError] = useState<string | null>(null);
+  const [doctors, setDoctors] = useState<{ id: string; name: string }[]>([]);
+  const [assigning, setAssigning] = useState(false);
+
+  const [selected, setSelected] = useState<Detail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const load = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const statuses = TABS[tab].statuses;
-      const res = user?.role === "DOCTOR"
-        ? await nestApi.getMyAppointments(statuses, page)
-        : await nestApi.getAppointments(statuses, page);
-      setAppointments(res.appointments as Appointment[]);
+      const t = TABS[tab];
+      let res: { appointments: unknown[]; pagination: PaginationMeta };
+      if (isDoctor) {
+        res = await nestApi.getMyAppointments(t.statuses, page);
+      } else {
+        res = await nestApi.getAppointments({ status: t.statuses, assigned: t.assigned, paymentStatus: t.paymentStatus, page });
+      }
+      setAppointments(res.appointments as Brief[]);
       setPagination(res.pagination);
-    } catch (e) { console.error(e); } finally { setLoading(false); }
+    } catch (e) {
+      console.error(e);
+      setError(e instanceof Error ? e.message : "Could not load appointments");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { load(); }, [user, tab, page]);
+  useEffect(() => {
+    load();
+    if (canAssign) {
+      nestApi.getAssignableDoctors()
+        .then((r) => setDoctors((r.doctors || []).map((d) => ({ id: d.id, name: d.name }))))
+        .catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, tab, page]);
 
   const selectTab = (i: number) => { setTab(i); setPage(1); };
 
-  const confirmAppointment = async (id: string) => {
+  const openDetail = async (id: string) => {
+    setSelected(null);
+    setDetailLoading(true);
+    try {
+      const res = await nestApi.getAppointment(id);
+      setSelected(res.appointment as Detail);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Could not load appointment detail");
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const reloadDetail = async () => {
+    if (!selected) return;
+    try {
+      const res = await nestApi.getAppointment(selected.id);
+      setSelected(res.appointment as Detail);
+      await load();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Could not reload");
+    }
+  };
+
+  const confirmed = async (id: string) => {
     if (!confirm("Confirm this appointment?")) return;
-    try { await nestApi.confirmAppointment(id); setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status: "CONFIRMED" } : a))); }
+    try { await nestApi.confirmAppointment(id); await reloadDetail(); }
     catch (e) { alert(e instanceof Error ? e.message : "Could not confirm"); }
   };
 
-  const cancelAppointment = async (id: string) => {
+  const cancelOne = async (id: string) => {
     const reason = prompt("Reason for cancelling:");
     if (reason === null) return;
-    try { await nestApi.cancelAppointment(id, reason || undefined, true); setAppointments((prev) => prev.filter((a) => a.id !== id)); }
+    try { await nestApi.cancelAppointment(id, reason || undefined, true); await reloadDetail(); }
     catch (e) { alert(e instanceof Error ? e.message : "Could not cancel"); }
   };
 
-  const completeAppointment = async (id: string) => {
+  const completeOne = async (id: string) => {
     if (!confirm("Mark as completed?")) return;
-    try { await nestApi.updateAppointmentStatus(id, "COMPLETED"); setAppointments((prev) => prev.filter((a) => a.id !== id)); }
+    try { await nestApi.updateAppointmentStatus(id, "COMPLETED"); await reloadDetail(); }
     catch (e) { alert(e instanceof Error ? e.message : "Could not complete"); }
   };
 
   const markNoShow = async (id: string) => {
     if (!confirm("Mark as no-show?")) return;
-    try { await nestApi.updateAppointmentStatus(id, "NO_SHOW"); setAppointments((prev) => prev.filter((a) => a.id !== id)); }
+    try { await nestApi.updateAppointmentStatus(id, "NO_SHOW"); await reloadDetail(); }
     catch (e) { alert(e instanceof Error ? e.message : "Could not mark no-show"); }
   };
 
+  const assignDoc = async (doctorId: string) => {
+    if (!selected || !doctorId) return;
+    setAssigning(true);
+    try { await nestApi.assignDoctor(selected.id, doctorId); await reloadDetail(); }
+    catch (e) { alert(e instanceof Error ? `Could not assign: ${e.message}` : "Could not assign doctor"); }
+    finally { setAssigning(false); }
+  };
+
   return (
-    <div className="animate-fade-up">
+    <div className="animate-fade-up h-screen relative p-4 lg:p-6">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Booked Appointments</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Appointments</h1>
           <p className="mt-1 text-sm text-slate-500">
             {pagination ? pagination.total : appointments.length} appointment{(pagination?.total ?? appointments.length) === 1 ? "" : "s"} &middot; {TABS[tab].label.toLowerCase()}
           </p>
@@ -123,110 +202,191 @@ export default function BookedAppointmentsPage() {
       </div>
 
       {loading ? (
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="rounded-2xl border border-slate-200 bg-white p-5">
-              <div className="h-4 w-32 animate-pulse rounded-lg bg-slate-100" />
-              <div className="mt-2 h-3 w-48 animate-pulse rounded-lg bg-slate-100" />
-            </div>
-          ))}
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => <div key={i} className="h-14 animate-pulse rounded-xl bg-slate-100" />)}
         </div>
+      ) : error ? (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</div>
       ) : appointments.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-white py-16 text-center">
           <AlertCircle className="h-10 w-10 text-slate-300" />
           <p className="mt-3 text-sm font-medium text-slate-500">No appointments found</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {appointments.map((apt, idx) => {
+        <div className="space-y-2">
+          <div className="hidden sm:grid grid-cols-12 gap-4 px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+            <span className="col-span-3">Patient</span>
+            <span className="col-span-2">Reference</span>
+            <span className="col-span-2">Date booked</span>
+            <span className="col-span-2">Email</span>
+            <span className="col-span-2">Phone</span>
+            <span className="col-span-1 text-right">Status</span>
+          </div>
+          {appointments.map((apt) => {
             const name = apt.patient?.name ?? apt.contactName;
             const email = apt.patient?.email ?? apt.contactEmail;
             const phone = apt.patient?.phone ?? apt.contactPhone;
             return (
-              <div key={apt.id} className="rounded-2xl border border-slate-200 bg-white p-5 transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-slate-100 animate-fade-up" style={{ animationDelay: `${idx * 0.04}s` } as React.CSSProperties}>
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100">
-                      <User className="h-5 w-5 text-slate-500" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-slate-900">{name}</p>
-                      <p className="text-xs text-slate-400">{email}{phone ? ` · ${phone}` : ""}</p>
-                      <p className="mt-0.5 font-mono text-[11px] text-slate-400">Ref: {apt.referenceNumber}</p>
-                    </div>
-                  </div>
-                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_BADGE[apt.status] ?? "bg-slate-100 text-slate-600"}`}>
-                    {apt.status.replace(/_/g, " ")}
+              <button key={apt.id} onClick={() => openDetail(apt.id)}
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-left transition hover:border-indigo-200 hover:bg-indigo-50/40">
+                <div className="grid grid-cols-2 sm:grid-cols-12 gap-x-4 gap-y-1 items-center">
+                  <span className="col-span-2 sm:col-span-3 flex items-center gap-2">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100"><User className="h-4 w-4 text-slate-500" /></span>
+                    <span className="font-semibold text-slate-900 truncate">{name}</span>
+                  </span>
+                  <span className="col-span-2 sm:col-span-2 font-mono text-xs text-slate-500 truncate">{apt.referenceNumber}</span>
+                  <span className="col-span-2 sm:col-span-2 text-sm text-slate-600">{fmtDateShort(apt.createdAt)}</span>
+                  <span className="col-span-2 sm:col-span-2 text-sm text-slate-600 truncate">{email}</span>
+                  <span className="col-span-2 sm:col-span-2 text-sm text-slate-600 truncate">{phone ?? "—"}</span>
+                  <span className="col-span-2 sm:col-span-1 flex items-center justify-between sm:justify-end gap-2">
+                    <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${STATUS_BADGE[apt.status] ?? "bg-slate-100 text-slate-600"}`}>
+                      {apt.status.replace(/_/g, " ")}
+                    </span>
+                    <ChevronRight className="h-4 w-4 text-slate-300" />
                   </span>
                 </div>
-
-                <div className="mt-4 grid gap-3 text-sm sm:grid-cols-3 border-t border-slate-100 pt-4">
-                  <div className="flex items-start gap-2">
-                    <Clock className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-                    <div>
-                      <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Date & Time</p>
-                      <p className="font-medium text-slate-700">{fmtDate(apt.startAt)}</p>
-                      <p className="text-slate-500">{fmtTime(apt.startAt)} &ndash; {fmtTime(apt.endAt)}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <Stethoscope className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-                    <div>
-                      <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Doctor</p>
-                      <p className="font-medium text-slate-700">{apt.doctor?.name ?? "—"}</p>
-                      <p className="text-xs text-slate-500">{apt.doctor?.specialty}</p>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Service</p>
-                    <p className="font-medium text-slate-700">{apt.consultationType.name}</p>
-                  </div>
-                </div>
-
-                {(apt.status === "CANCELLED" || apt.status === "REJECTED") && (
-                  <div className="mt-3 rounded-xl bg-rose-50 border border-rose-100 px-3 py-2 text-xs text-rose-700">
-                    {apt.status === "CANCELLED" ? "Cancelled" : "Rejected"}
-                    {apt.cancelledAt ? ` on ${fmtDate(apt.cancelledAt)}` : ""}
-                    {apt.cancellationReason ? ` — ${apt.cancellationReason}` : ""}
-                  </div>
-                )}
-
-                {apt.notes && (
-                  <div className="mt-3 rounded-xl bg-slate-50 border border-slate-100 px-3 py-2 text-xs text-slate-600">
-                    <span className="font-semibold">Note:</span> {apt.notes}
-                  </div>
-                )}
-
-                {apt.payment && (
-                  <span className="mt-2 inline-flex rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
-                    Paid ₦{Number(apt.payment.amount).toLocaleString()}
-                  </span>
-                )}
-
-                <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-3">
-                  {apt.status === "PENDING" && (
-                    <>
-                      <button onClick={() => cancelAppointment(apt.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50">Cancel</button>
-                      <button onClick={() => confirmAppointment(apt.id)} className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-md shadow-indigo-200 transition hover:bg-indigo-700">Confirm</button>
-                    </>
-                  )}
-                  {apt.status === "CONFIRMED" && (
-                    <>
-                      <button onClick={() => cancelAppointment(apt.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50">Cancel</button>
-                      <button onClick={() => markNoShow(apt.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-semibold text-amber-600 transition hover:bg-amber-50">No Show</button>
-                    </>
-                  )}
-                  {(apt.status === "CONFIRMED" || apt.status === "CHECKED_IN" || apt.status === "IN_PROGRESS") && (
-                    <button onClick={() => completeAppointment(apt.id)} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-md shadow-emerald-200 transition hover:bg-emerald-700">Completed</button>
-                  )}
-                </div>
-              </div>
+              </button>
             );
           })}
         </div>
       )}
 
       <Pager pagination={pagination} onPage={setPage} />
+
+      {detailLoading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-white p-8 text-center">
+            <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-indigo-600" />
+          </div>
+        </div>
+      )}
+
+      {selected && (
+        <div className="fixed h-full top-0 inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 backdrop-blur-2xl p-4 sm:p-8" onClick={() => setSelected(null)}>
+          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Appointment details</h2>
+                <p className="font-mono text-xs text-slate-400">Ref: {selected.referenceNumber}</p>
+              </div>
+              <button onClick={() => setSelected(null)} className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xl font-bold text-slate-900">{selected.patient?.name ?? selected.contactName}</p>
+                  <p className="text-sm text-slate-500">{selected.patient?.email ?? selected.contactEmail}{selected.patient?.phone ?? selected.contactPhone ? ` · ${selected.patient?.phone ?? selected.contactPhone}` : ""}</p>
+                </div>
+                <span className={`rounded-full px-3 py-1 text-xs font-bold ${STATUS_BADGE[selected.status] ?? "bg-slate-100 text-slate-600"}`}>
+                  {selected.status.replace(/_/g, " ")}
+                </span>
+              </div>
+
+              <dl className="mt-5 grid gap-x-6 gap-y-3 sm:grid-cols-2 text-sm">
+                <div className="rounded-xl bg-slate-50 p-3">
+                  <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Date booked</dt>
+                  <dd className="mt-0.5 font-medium text-slate-700">{fmtDate(selected.createdAt)} · {fmtTime(selected.createdAt)}</dd>
+                </div>
+                <div className="rounded-xl bg-slate-50 p-3">
+                  <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Appointment</dt>
+                  <dd className="mt-0.5 font-medium text-slate-700">{fmtDate(selected.startAt)} · {fmtTime(selected.startAt)} – {fmtTime(selected.endAt)}</dd>
+                </div>
+                <div className="rounded-xl bg-slate-50 p-3">
+                  <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Doctor</dt>
+                  <dd className="mt-0.5 font-medium text-slate-700">{selected.doctor?.name ?? "Unassigned"}</dd>
+                  {selected.doctor?.specialty && <dd className="text-xs text-slate-500">{selected.doctor.specialty}</dd>}
+                </div>
+                <div className="rounded-xl bg-slate-50 p-3">
+                  <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Appointment type</dt>
+                  <dd className="mt-0.5 font-medium text-slate-700">{selected.consultationType.name}</dd>
+                  {selected.service?.name && <dd className="text-xs text-slate-500">{selected.service.name}</dd>}
+                </div>
+                <div className="rounded-xl bg-slate-50 p-3">
+                  <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Branch</dt>
+                  <dd className="mt-0.5 font-medium text-slate-700">{selected.branch?.name ?? "—"}</dd>
+                </div>
+                <div className="rounded-xl bg-slate-50 p-3">
+                  <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Payment</dt>
+                  <dd className="mt-0.5 flex items-center gap-1.5 font-medium text-slate-700">
+                    {selected.payment
+                      ? (selected.payment.status === "COMPLETED"
+                          ? <><DollarSign className="h-3.5 w-3.5 text-emerald-600" /> Paid ₦{Number(selected.payment.amount).toLocaleString()}</>
+                          : <><CreditCard className="h-3.5 w-3.5 text-amber-600" /> {selected.payment.status.toLowerCase()}</>)
+                      : "No payment recorded"}
+                  </dd>
+                </div>
+              </dl>
+
+              {selected.medicalNoteUrl && (
+                <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
+                  <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                    <Paperclip className="h-3.5 w-3.5" /> Medical note
+                  </p>
+                  <a href={selected.medicalNoteUrl} target="_blank" rel="noreferrer"
+                    className="mt-1 inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-md shadow-indigo-200 transition hover:bg-indigo-700">
+                    View attachment
+                  </a>
+                </div>
+              )}
+
+              {selected.notes && (
+                <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
+                  <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                    <StickyNote className="h-3.5 w-3.5" /> Clinical notes
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{selected.notes}</p>
+                </div>
+              )}
+
+              {(selected.status === "CANCELLED" || selected.status === "REJECTED" || selected.status === "NO_SHOW") && (
+                <div className="mt-4 rounded-xl bg-rose-50 border border-rose-100 px-3 py-2 text-xs text-rose-700">
+                  {selected.status.replace(/_/g, " ")}
+                  {selected.cancelledAt ? ` on ${fmtDate(selected.cancelledAt)}` : ""}
+                  {selected.cancelledBy ? ` by ${selected.cancelledBy}` : ""}
+                  {selected.cancellationReason ? ` — ${selected.cancellationReason}` : ""}
+                </div>
+              )}
+
+              {selected.status === "PENDING" && !selected.doctor && canAssign && (
+                <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                  <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-800">
+                    <CalendarPlus className="h-4 w-4" /> Unassigned
+                  </p>
+                  <select
+                    value=""
+                    onChange={(e) => assignDoc(e.target.value)}
+                    disabled={assigning}
+                    className="mt-2 w-full rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-200">
+                    <option value="" disabled>{assigning ? "Assigning…" : "Assign doctor…"}</option>
+                    {doctors.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 px-6 py-4">
+              {selected.status === "PENDING" && (
+                <>
+                  <button onClick={() => cancelOne(selected.id)} className="rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50">Cancel</button>
+                  <button onClick={() => confirmed(selected.id)} className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-md shadow-indigo-200 transition hover:bg-indigo-700">Confirm</button>
+                </>
+              )}
+              {selected.status === "CONFIRMED" && (
+                <>
+                  <button onClick={() => cancelOne(selected.id)} className="rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50">Cancel</button>
+                  <button onClick={() => markNoShow(selected.id)} className="rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-semibold text-amber-600 transition hover:bg-amber-50">No Show</button>
+                </>
+              )}
+              {(selected.status === "CONFIRMED" || selected.status === "CHECKED_IN" || selected.status === "IN_PROGRESS") && (
+                <button onClick={() => completeOne(selected.id)} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-md shadow-emerald-200 transition hover:bg-emerald-700">Mark completed</button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

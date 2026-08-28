@@ -15,8 +15,8 @@ export default function AdminDashboard() {
     async function load() {
       try {
         const [bookedRes, completedRes] = await Promise.all([
-          user?.role === "DOCTOR" ? nestApi.getMyAppointments("CONFIRMED") : nestApi.getAppointments("CONFIRMED"),
-          user?.role === "DOCTOR" ? nestApi.getMyAppointments("COMPLETED") : nestApi.getAppointments("COMPLETED"),
+          user?.role === "DOCTOR" ? nestApi.getMyAppointments("CONFIRMED") : nestApi.getAppointments({ status: "CONFIRMED" }),
+          user?.role === "DOCTOR" ? nestApi.getMyAppointments("COMPLETED") : nestApi.getAppointments({ status: "COMPLETED" }),
         ]);
         const booked = bookedRes.appointments?.length || 0;
         const completed = completedRes.appointments?.length || 0;
@@ -51,7 +51,7 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <div className="animate-fade-up">
+    <div className="animate-fade-up p-4 lg:p-6">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-900">{greeting()}, {user?.name?.split(" ")[0]}</h1>
         <p className="mt-1 text-sm text-slate-500">Here&apos;s what&apos;s happening with your clinic today.</p>

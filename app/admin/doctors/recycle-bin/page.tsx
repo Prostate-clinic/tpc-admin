@@ -39,7 +39,7 @@ export default function RecycleBinPage() {
     }
 
     return (
-        <div className="animate-fade-up">
+        <div className="animate-fade-up p-4 lg:p-6">
             <div>
                 <h1 className="text-2xl font-bold text-slate-900">Recycle Bin</h1>
                 <p className="mt-1 text-sm text-slate-500 animate-fade-up-delay-1">

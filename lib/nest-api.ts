@@ -253,13 +253,21 @@ export const nestApi = {
    * `status` accepts one status or a list (sent comma-separated); omit for
    * everything. Paginated: pass `page`/`limit` (max 100), read `pagination`.
    */
-  getAppointments(status?: AppointmentStatus | AppointmentStatus[], page = 1, limit = 20) {
+  getAppointments(opts: {
+    status?: AppointmentStatus | AppointmentStatus[];
+    assigned?: "yes" | "no";
+    paymentStatus?: "AWAITING" | "COMPLETED" | "PENDING" | "FAILED" | "REFUNDED";
+    page?: number;
+    limit?: number;
+  } = {}) {
     const params = new URLSearchParams();
-    if (status) {
-      params.set("status", (Array.isArray(status) ? status : [status]).join(","));
+    if (opts.status) {
+      params.set("status", (Array.isArray(opts.status) ? opts.status : [opts.status]).join(","));
     }
-    params.set("page", String(page));
-    params.set("limit", String(limit));
+    if (opts.assigned) params.set("assigned", opts.assigned);
+    if (opts.paymentStatus) params.set("paymentStatus", opts.paymentStatus);
+    params.set("page", String(opts.page ?? 1));
+    params.set("limit", String(opts.limit ?? 20));
     return request<{ appointments: unknown[]; pagination: PaginationMeta }>(
       `/appointments?${params.toString()}`,
       { method: "GET" },
@@ -278,6 +286,11 @@ export const nestApi = {
       `/appointments/my-schedule?${params.toString()}`,
       { method: "GET" },
     );
+  },
+
+  /** Full detail of a single appointment (staff view). */
+  getAppointment(id: string) {
+    return request<{ appointment: unknown }>(`/appointments/${id}`, { method: "GET" });
   },
 
   /**
@@ -334,6 +347,13 @@ export const nestApi = {
     return request<{ appointment: unknown }>(`/appointments/${id}/reschedule`, {
       method: "PATCH",
       body: { startAt, reason },
+    });
+  },
+
+  assignDoctor(id: string, doctorId: string) {
+    return request<{ appointment: unknown }>(`/appointments/${id}/assign-doctor`, {
+      method: "PATCH",
+      body: { doctorId },
     });
   },
 
@@ -423,6 +443,14 @@ export const nestApi = {
 
   getAdminDoctors() {
     return request<{ doctors: DoctorAdminRecord[] }>("/admin/doctors", { method: "GET" });
+  },
+
+  /** Active doctors for the front-desk assign-doctor picker (ADMIN/FRONTDESK/DOCTOR). */
+  getAssignableDoctors() {
+    return request<{ doctors: { id: string; name: string; specialty: string; branchId: string | null }[] }>(
+      "/appointments/doctors",
+      { method: "GET" },
+    );
   },
 
   createAdminDoctor(data: { name: string; specialty: string; bio?: string; image?: string; profileImage?: File, email?:string }) {

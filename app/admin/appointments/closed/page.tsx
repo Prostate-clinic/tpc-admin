@@ -33,7 +33,7 @@ export default function ClosedAppointmentsPage() {
     try {
       const res = user?.role === "DOCTOR"
         ? await nestApi.getMyAppointments("COMPLETED", page)
-        : await nestApi.getAppointments("COMPLETED", page);
+        : await nestApi.getAppointments({ status: "COMPLETED", page });
       setAppointments(res.appointments as Appointment[]);
       setPagination(res.pagination);
     } catch (e) { console.error(e); } finally { setLoading(false); }
@@ -42,7 +42,7 @@ export default function ClosedAppointmentsPage() {
   useEffect(() => { load(); }, [user, page]);
 
   return (
-    <div className="animate-fade-up">
+    <div className="animate-fade-up p-4 lg:p-6">
       <div className="page-header">
         <h1 className="page-title">Completed Appointments</h1>
         <p className="page-subtitle">{appointments.length} completed</p>

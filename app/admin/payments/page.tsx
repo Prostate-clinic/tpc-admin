@@ -34,7 +34,7 @@ export default function PaymentsPage() {
   const total = payments.reduce((s, p) => s + Number(p.amount), 0);
 
   return (
-    <div className="animate-fade-up">
+    <div className="animate-fade-up p-4 lg:p-6">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Payments</h1>

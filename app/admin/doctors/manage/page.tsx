@@ -57,7 +57,7 @@ export default function ManageDoctorsPage() {
 
   return (
     <>
-      <div className="animate-fade-up">
+      <div className="animate-fade-up p-4 lg:p-6">
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-slate-900">Manage Doctors</h1>
           <p className="mt-1 text-sm text-slate-500">Create accounts and manage doctor profiles.</p>

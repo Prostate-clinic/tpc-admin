@@ -74,7 +74,7 @@ export default function AllBlogsPage() {
   }
 
   return (
-    <div className="animate-fade-up space-y-6">
+    <div className="animate-fade-up space-y-6 p-4 lg:p-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">All Blog Posts</h1>
@@ -121,7 +121,7 @@ export default function AllBlogsPage() {
               const busy = actionId === blog.id;
 
               return (
-                <div key={blog.id} className="smooth-card rounded-lg border border-slate-200 flex flex-col gap-3 p-2">
+                <div key={blog.id} className="smooth-card rounded-lg border border-slate-200 bg-white flex flex-col gap-3 p-3">
                 {blog.coverImage && (
                   <img
                     src={blog.coverImage}

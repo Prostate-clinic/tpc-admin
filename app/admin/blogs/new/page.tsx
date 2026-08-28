@@ -237,7 +237,7 @@ export default function NewBlogPage() {
     }
 
     return (
-        <div className="animate-fade-up space-y-5">
+        <div className="animate-fade-up space-y-5 p-4 lg:p-6">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">

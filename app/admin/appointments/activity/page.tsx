@@ -85,7 +85,7 @@ export default function ActivityLogPage() {
   const selectFilter = (a: string) => { setActionFilter(a); setPage(1); };
 
   return (
-    <div className="animate-fade-up">
+    <div className="animate-fade-up p-4 lg:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="page-header">
           <h1 className="page-title">Activity Log</h1>

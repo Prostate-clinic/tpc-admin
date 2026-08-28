@@ -54,7 +54,7 @@ export default function BlogDetailPage() {
     }
 
     return (
-        <div className="animate-fade-up space-y-6 pb-16">
+        <div className="animate-fade-up space-y-6 pb-16 p-4 lg:p-6">
             {/* Back */}
             <div className="flex items-center gap-3">
                 <Link

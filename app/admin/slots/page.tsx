@@ -84,7 +84,7 @@ export default function SchedulePage() {
   if (loading) return <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-indigo-600" /></div>;
 
   return (
-    <div className="animate-fade-up">
+    <div className="animate-fade-up p-4 lg:p-6">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-900">Weekly Schedule</h1>
         <p className="mt-1 max-w-2xl text-sm text-slate-500">Set your recurring working hours. Slots are generated automatically.</p>
