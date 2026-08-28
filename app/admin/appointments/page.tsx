@@ -4,10 +4,19 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { nestApi, AppointmentStatus, PaginationMeta } from "@/lib/nest-api";
 import Pager from "@/components/Pager";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import Toast from "@/components/Toast";
 import {
   RefreshCw, User, AlertCircle, ChevronRight, CalendarPlus, X,
   Paperclip, StickyNote, CreditCard, DollarSign,
 } from "lucide-react";
+
+type ActionDialog =
+  | { kind: "confirm"; id: string }
+  | { kind: "cancel"; id: string }
+  | { kind: "complete"; id: string }
+  | { kind: "noshow"; id: string }
+  | null;
 
 type Brief = {
   id: string;
@@ -19,7 +28,7 @@ type Brief = {
   patient: { name: string; email: string | null; phone: string | null } | null;
   doctor: { name: string; specialty: string | null } | null;
   consultationType: { name: string; durationMinutes: number };
-  payment: { amount: string; status: string } | null;
+  payment: { amount: string; status: string; reference?: string | null } | null;
   contactName: string;
   contactEmail: string;
   contactPhone: string | null;
@@ -317,6 +326,9 @@ export default function BookedAppointmentsPage() {
                           : <><CreditCard className="h-3.5 w-3.5 text-amber-600" /> {selected.payment.status.toLowerCase()}</>)
                       : "No payment recorded"}
                   </dd>
+                  {selected.payment?.reference && (
+                    <dd className="mt-1 font-mono text-xs text-slate-500">Ref: {selected.payment.reference}</dd>
+                  )}
                 </div>
               </dl>
 
@@ -370,11 +382,11 @@ export default function BookedAppointmentsPage() {
             <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 px-6 py-4">
               {selected.status === "PENDING" && (
                 <>
-                  <button onClick={() => cancelOne(selected.id)} className="rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50">Cancel</button>
+                  {/* <button onClick={() => cancelOne(selected.id)} className="rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50">Cancel</button> */}
                   <button onClick={() => confirmed(selected.id)} className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-md shadow-indigo-200 transition hover:bg-indigo-700">Confirm</button>
                 </>
               )}
-              {selected.status === "CONFIRMED" && (
+              {selected.status === "CONFIRMED" && selected.doctor && (
                 <>
                   <button onClick={() => cancelOne(selected.id)} className="rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50">Cancel</button>
                   <button onClick={() => markNoShow(selected.id)} className="rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-semibold text-amber-600 transition hover:bg-amber-50">No Show</button>
