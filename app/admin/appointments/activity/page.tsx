@@ -135,7 +135,7 @@ export default function ActivityLogPage() {
         <div className="w-full flex items-center gap-2 overflow-x-scroll">
           <button
             onClick={selectAll}
-            className={`rounded-full w-fit px-4 py-1.5 text-xs font-semibold transition ${groupFilter === "" && actionFilter === "" ? "bg-indigo-600 text-white shadow-md shadow-indigo-200" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}>
+            className={`rounded-full w-max px-4 py-1.5 text-xs font-semibold transition ${groupFilter === "" && actionFilter === "" ? "bg-indigo-600 text-white shadow-md shadow-indigo-200" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}>
             All actions
           </button>
           {FILTER_GROUPS.map((group) => {
