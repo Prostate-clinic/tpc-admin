@@ -132,7 +132,7 @@ export default function ActivityLogPage() {
       </div>
 
       <div className="mt-4 space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 overflow-x-scroll">
           <button
             onClick={selectAll}
             className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${groupFilter === "" && actionFilter === "" ? "bg-indigo-600 text-white shadow-md shadow-indigo-200" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}>
