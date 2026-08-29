@@ -44,11 +44,11 @@ export default function ConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 p-4 h-screen"
+      className="fixed inset-0 z-[60] flex overflow-y-auto overscroll-contain bg-slate-900/40 p-4"
       onClick={() => !busy && onClose()}
     >
       <div
-        className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+        className="m-auto w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3">

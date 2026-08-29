@@ -59,10 +59,6 @@ const navItems: Record<string, NavItem[]> = {
   ADMIN: [
     { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
     { href: "/admin/appointments", label: "Appointments", icon: CalendarDays },
-    { href: "/admin/appointments/closed", label: "Closed", icon: ClipboardCheck },
-    { href: "/admin/appointments/activity", label: "Activity", icon: Eye },
-    { href: "/admin/payments", label: "Payments", icon: CreditCard },
-    { href: "/admin/services", label: "Services", icon: Package },
     { href: "/admin/slots", label: "Schedule", icon: Clock },
     {
       href: "/admin/doctors",
@@ -74,6 +70,8 @@ const navItems: Record<string, NavItem[]> = {
         { href: "/admin/doctors/recycle-bin", label: "Recycle Bin", icon: Trash2 },
       ],
     },
+    { href: "/admin/payments", label: "Payments", icon: CreditCard },
+    { href: "/admin/services", label: "Services", icon: Package },
     {
       href: "/admin/blogs",
       label: "Blog",
@@ -84,6 +82,7 @@ const navItems: Record<string, NavItem[]> = {
         { href: "/admin/blogs/new", label: "New Post", icon: PlusCircle },
       ],
     },
+    { href: "/admin/appointments/activity", label: "Activity", icon: Eye },
   ],
 };
 

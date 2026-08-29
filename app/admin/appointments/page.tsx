@@ -71,9 +71,12 @@ const STATUS_BADGE: Record<string, string> = {
   NO_SHOW: "bg-orange-100 text-orange-700",
 };
 
+/** Still on a patient's calendar (not completed/cancelled). */
+const ACTIVE_STATUSES = ["PENDING", "CONFIRMED", "CHECKED_IN", "IN_PROGRESS"];
+
 const TABS: TabDef[] = [
   { label: "Awaiting Payment", statuses: ["PENDING"], paymentStatus: "AWAITING" },
-  { label: "Unassigned", statuses: ["PENDING"], assigned: "no" },
+  { label: "Unassigned", statuses: ["PENDING", "CONFIRMED", "CHECKED_IN", "IN_PROGRESS"], assigned: "no" },
   { label: "Assigned", statuses: ["CONFIRMED", "CHECKED_IN", "IN_PROGRESS"], assigned: "yes" },
   { label: "Completed", statuses: ["COMPLETED"] },
   { label: "Cancelled", statuses: ["CANCELLED", "REJECTED", "NO_SHOW"] },
@@ -308,8 +311,8 @@ export default function BookedAppointmentsPage() {
       )}
 
       {selected && (
-        <div className="fixed h-full top-0 inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 backdrop-blur-2xl p-4 sm:p-8" onClick={() => setSelected(null)}>
-          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-slate-900/40 backdrop-blur-2xl p-4 sm:p-8" onClick={() => setSelected(null)}>
+          <div className="m-auto w-full max-w-2xl rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
               <div>
                 <h2 className="text-lg font-bold text-slate-900">Appointment details</h2>
@@ -399,12 +402,12 @@ export default function BookedAppointmentsPage() {
                 </div>
               )}
 
-              {selected.status === "PENDING" && !selected.doctor && canAssign && selected.payment?.status === "COMPLETED" && (
+              {ACTIVE_STATUSES.includes(selected.status) && !selected.doctor && canAssign && selected.payment?.status === "COMPLETED" && (
                 <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
                   <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-800">
-                    <CalendarPlus className="h-4 w-4" /> Unassigned — assign to confirm
+                    <CalendarPlus className="h-4 w-4" /> Unassigned — assign a doctor
                   </p>
-                  <p className="mt-1 text-xs text-amber-700">Choose a doctor to immediately confirm this appointment and notify the doctor.</p>
+                  <p className="mt-1 text-xs text-amber-700">This booking has no doctor yet. Assigning notifies the doctor; already-paid appointments stay confirmed.</p>
                   <select
                     value=""
                     onChange={(e) => assignDoc(e.target.value)}
@@ -415,7 +418,7 @@ export default function BookedAppointmentsPage() {
                   </select>
                 </div>
               )}
-              {selected.status === "PENDING" && !selected.doctor && selected.payment?.status !== "COMPLETED" && (
+              {ACTIVE_STATUSES.includes(selected.status) && !selected.doctor && selected.payment?.status !== "COMPLETED" && (
                 <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
                   <p className="text-xs font-semibold text-slate-600">Awaiting payment — view only</p>
                   <p className="mt-1 text-xs text-slate-500">This appointment cannot be assigned until payment is completed.</p>
