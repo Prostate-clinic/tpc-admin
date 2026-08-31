@@ -336,11 +336,12 @@ export const nestApi = {
    * what, when, and to which booking. Admin only. Paginated.
    */
   getActivityLog(
-    filters?: { action?: string; actions?: string; actorType?: string },
+    filters?: { type?: string; action?: string; actions?: string; actorType?: string },
     page = 1,
     limit = 20,
   ) {
     const params = new URLSearchParams();
+    if (filters?.type) params.set("type", filters.type);
     if (filters?.action) params.set("action", filters.action);
     if (filters?.actions) params.set("actions", filters.actions);
     if (filters?.actorType) params.set("actorType", filters.actorType);
