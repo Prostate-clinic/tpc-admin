@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { clearStaffToken, getStaffToken, nestApi, setStaffToken, type StaffUser } from "@/lib/nest-api";
+import { clearAllAuth, clearStaffToken, getStaffToken, nestApi, setStaffToken, type StaffUser } from "@/lib/nest-api";
 
 type User = StaffUser;
 
@@ -24,17 +24,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     const token = getStaffToken();
-    if (!token) {
+    const refreshTokenPresent = typeof window !== "undefined" && !!window.localStorage.getItem("imo_staff_refresh");
+
+    if (!token && !refreshTokenPresent) {
       setUser(null);
       setLoading(false);
       return;
     }
 
     try {
-      const profile = await nestApi.getStaffProfile(token);
+      // If only the refresh token remains (access token expired on load), the
+      // nest-api layer rotates it transparently. If the access token is present
+      // it may still be valid; getStaffProfile will attempt it.
+      const profile = await nestApi.getStaffProfile();
       setUser(profile);
     } catch {
-      clearStaffToken();
+      await clearAllAuth();
       setUser(null);
     } finally {
       setLoading(false);
@@ -63,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    clearStaffToken();
+    await clearAllAuth();
     setUser(null);
     router.push("/login");
   };

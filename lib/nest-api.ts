@@ -168,6 +168,7 @@ type RequestOptions = Omit<RequestInit, "body"> & {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_NEST_API_BASE_URL || "http://localhost:4000/api";
 const STAFF_TOKEN_KEY = "imo_staff_token";
+const STAFF_REFRESH_KEY = "imo_staff_refresh";
 
 export function getStaffToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -179,29 +180,94 @@ export function setStaffToken(token: string) {
   window.localStorage.setItem(STAFF_TOKEN_KEY, token);
 }
 
+function getRefreshToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(STAFF_REFRESH_KEY);
+}
+
+function setRefreshToken(token: string | null) {
+  if (typeof window === "undefined") return;
+  if (token) window.localStorage.setItem(STAFF_REFRESH_KEY, token);
+  else window.localStorage.removeItem(STAFF_REFRESH_KEY);
+}
+
+/** Opaque refresh-token rotation: POST the refresh token, get a fresh pair. */
+async function rotateRefresh(): Promise<string | null> {
+  const refresh = getRefreshToken();
+  if (!refresh) return null;
+
+  const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh_token: refresh }),
+  });
+
+  if (!res.ok) {
+    clearStaffToken();
+    setRefreshToken(null);
+    return null;
+  }
+
+  const payload = await res.json();
+  if (!payload.access_token || !payload.refresh_token) {
+    clearStaffToken();
+    setRefreshToken(null);
+    return null;
+  }
+
+  setStaffToken(payload.access_token);
+  setRefreshToken(payload.refresh_token);
+  return payload.access_token;
+}
+
 export function clearStaffToken() {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(STAFF_TOKEN_KEY);
 }
 
+export async function clearAllAuth() {
+  const refresh = getRefreshToken();
+  if (refresh) {
+    try {
+      await fetch(`${API_BASE_URL}/auth/logout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: refresh }),
+      });
+    } catch {
+      // best-effort server-side revocation
+    }
+  }
+  clearStaffToken();
+  setRefreshToken(null);
+}
+
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const token = options.token ?? getStaffToken();
+  let token = options.token ?? getStaffToken();
   const headers = new Headers(options.headers || undefined);
 
   if (options.body !== undefined && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
 
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
+  const doFetch = async (tok: string | null) => {
+    const h = new Headers(headers);
+    if (tok) h.set("Authorization", `Bearer ${tok}`);
+    return fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers: h,
+      credentials: "include",
+      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    });
+  };
 
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers,
-    credentials: "include",
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
-  });
+  let res = await doFetch(token);
+
+  // Transparently try one token rotation on 401 (access token expired).
+  if (res.status === 401 && !options.token) {
+    token = await rotateRefresh();
+    if (token) res = await doFetch(token);
+  }
 
   const contentType = res.headers.get("content-type") || "";
   const payload = contentType.includes("application/json") ? await res.json() : null;
@@ -218,14 +284,20 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
 export const nestApi = {
   loginStaff(email: string, password: string) {
-    return request<{ access_token: string; user: StaffUser }>("/auth/login", {
+    return request<{ access_token: string; refresh_token: string; user: StaffUser }>("/auth/login", {
       method: "POST",
       body: { email, password },
       token: null,
+    }).then((data) => {
+      // Store the rotating refresh token alongside the short-lived access token.
+      if (data.refresh_token) setRefreshToken(data.refresh_token);
+      return data;
     });
   },
 
   getStaffProfile(token?: string | null) {
+    // When `token` is omitted, `request` checks the stored access token and
+    // transparently rotates the refresh token on a 401.
     return request<StaffUser>("/auth/me", { method: "GET", token: token ?? undefined });
   },
 
