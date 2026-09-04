@@ -25,6 +25,7 @@ export default function NewBlogPage() {
     const { user } = useAuth();
     const router = useRouter();
     const isAdmin = user?.role === "ADMIN";
+    const isDevelopment = process.env.NEXT_PUBLIC_ENV === 'development';
 
     const [form, setForm] = useState({
         title: "",
@@ -45,6 +46,9 @@ export default function NewBlogPage() {
     }
 
     function fillDummy() {
+        if(!isDevelopment){
+            return;
+        }
         const samples = [
             {
                 title: "Understanding Prostate Cancer: Early Detection Saves Lives",
@@ -259,14 +263,14 @@ export default function NewBlogPage() {
                         </p>
                     </div>
                 </div>
-                <button
+                {isDevelopment && <button
                     type="button"
                     onClick={fillDummy}
                     className="flex items-center gap-2 rounded-xl border border-dashed border-indigo-300 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-100"
                 >
                     <Wand2 className="h-4 w-4" />
                     Fill with sample
-                </button>
+                </button>}
             </div>
 
             {/* Error */}
