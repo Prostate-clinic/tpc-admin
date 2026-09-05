@@ -166,7 +166,9 @@ type RequestOptions = Omit<RequestInit, "body"> & {
   token?: string | null;
 };
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_NEST_API_BASE_URL || "http://localhost:4000/api";
+// Same-origin API path. next.config rewrites() proxies /api/* to the NestJS
+// backend, so the backend URL is never exposed to the browser.
+const API_BASE_URL = "/api";
 const STAFF_TOKEN_KEY = "imo_staff_token";
 const STAFF_REFRESH_KEY = "imo_staff_refresh";
 

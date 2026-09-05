@@ -2,6 +2,10 @@ import type { NextConfig } from "next";
 
 const isDev = process.env.NODE_ENV === "development";
 
+// Origin of the NestJS backend. Server-side only — used by rewrites() to
+// proxy /api/* to the backend so the real URL never reaches the browser.
+const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:4000";
+
 const securityHeaders = [
 	{
 		key: "X-Frame-Options",
@@ -31,7 +35,7 @@ const securityHeaders = [
 			"style-src 'self' 'unsafe-inline'",
 			"img-src 'self' blob: data: https://res.cloudinary.com",
 			"font-src 'self' data:",
-			"connect-src 'self' http://localhost:4000 https://tpc-backend-xcz5.onrender.com",
+			"connect-src 'self'",
 			"object-src 'none'",
 			"base-uri 'self'",
 			"form-action 'self'",
@@ -58,6 +62,14 @@ const nextConfig: NextConfig = {
 			{
 				source: "/:path*",
 				headers: securityHeaders,
+			},
+		];
+	},
+	async rewrites() {
+		return [
+			{
+				source: "/api/:path*",
+				destination: `${BACKEND_URL}/api/:path*`,
 			},
 		];
 	},
