@@ -318,10 +318,18 @@ export const nestApi = {
     });
   },
 
-  resetAdminPassword(email: string, otp: string, newPassword: string) {
+  validateAdminResetToken(email: string, token: string) {
+    return request<{ valid: boolean; message?: string }>("/auth/forgot-password/validate", {
+      method: "POST",
+      body: { email, token },
+      token: null,
+    });
+  },
+
+  resetAdminPassword(email: string, token: string, newPassword: string) {
     return request<{ message: string }>("/auth/reset-password", {
       method: "POST",
-      body: { email, otp, newPassword },
+      body: { email, token, newPassword },
       token: null,
     });
   },

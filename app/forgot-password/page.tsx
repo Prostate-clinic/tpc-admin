@@ -1,136 +1,34 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Shield, Mail, ArrowLeft, Check, X, Loader2, KeyRound, Lock } from "lucide-react";
-import PasswordInput from "@/components/PasswordInput";
+import { Mail, ArrowLeft, KeyRound, Loader2, CheckCircle2 } from "lucide-react";
 import { nestApi } from "@/lib/nest-api";
 
 function validateEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
 
-function getPasswordChecks(pw: string) {
-  return {
-    length: pw.length >= 8,
-    upper: /[A-Z]/.test(pw),
-    lower: /[a-z]/.test(pw),
-    number: /\d/.test(pw),
-    special: /[@$!%*?&._-]/.test(pw),
-  };
-}
-function isStrongPassword(pw: string) {
-  const c = getPasswordChecks(pw);
-  return c.length && c.upper && c.lower && c.number && c.special;
-}
-
-function OtpInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const inputsRef = useRef<(HTMLInputElement | null)[]>([]);
-  const handleChange = (idx: number, val: string) => {
-    const digit = val.replace(/\D/g, "").slice(-1);
-    const next = value.split("");
-    while (next.length < 6) next.push("");
-    next[idx] = digit;
-    const newVal = next.join("").slice(0, 6);
-    onChange(newVal);
-    if (digit && idx < 5) inputsRef.current[idx + 1]?.focus();
-  };
-  const handleKeyDown = (idx: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Backspace" && !value[idx] && idx > 0) inputsRef.current[idx - 1]?.focus();
-    if (e.key === "ArrowLeft" && idx > 0) inputsRef.current[idx - 1]?.focus();
-    if (e.key === "ArrowRight" && idx < 5) inputsRef.current[idx + 1]?.focus();
-  };
-  const handlePaste = (e: React.ClipboardEvent) => {
-    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
-    if (pasted.length) {
-      e.preventDefault();
-      onChange(pasted);
-      const nextIdx = Math.min(pasted.length, 5);
-      inputsRef.current[nextIdx]?.focus();
-    }
-  };
-  return (
-    <div className="flex justify-center gap-2" onPaste={handlePaste}>
-      {Array.from({ length: 6 }).map((_, i) => (
-        <input
-          key={i}
-          ref={(el) => { inputsRef.current[i] = el; }}
-          type="text"
-          inputMode="numeric"
-          maxLength={1}
-          value={value[i] || ""}
-          onChange={(e) => handleChange(i, e.target.value)}
-          onKeyDown={(e) => handleKeyDown(i, e)}
-          className="h-12 w-11 rounded-xl border border-slate-300 bg-white text-center text-lg font-bold tracking-widest outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 sm:h-12 sm:w-12"
-        />
-      ))}
-    </div>
-  );
-}
-
 export default function ForgotPasswordPage() {
-  const [step, setStep] = useState<"email" | "otp">("email");
   const [email, setEmail] = useState("");
-  const [otp, setOtp] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [resendIn, setResendIn] = useState(0);
 
-  useEffect(() => {
-    if (resendIn <= 0) return;
-    const t = setTimeout(() => setResendIn((v) => v - 1), 1000);
-    return () => clearTimeout(t);
-  }, [resendIn]);
-
-  const checks = getPasswordChecks(newPassword);
-  const passwordsMatch = newPassword && confirmPassword && newPassword === confirmPassword;
-  const canReset = otp.length === 6 && isStrongPassword(newPassword) && passwordsMatch;
-
-  const handleSendCode = async (e: React.FormEvent) => {
+  const handleSendLink = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(""); setSuccess("");
+    setError("");
     if (!validateEmail(email)) { setError("Please enter a valid email address."); return; }
     setLoading(true);
     try {
       const res = await nestApi.forgotAdminPassword(email.trim());
-      setSuccess(res.message || "Reset code sent to your email.");
-      setStep("otp");
-      setResendIn(60);
+      setSent(true);
+      setError("");
+      void res;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send reset code");
+      setError(err instanceof Error ? err.message : "Failed to send reset link");
     } finally { setLoading(false); }
-  };
-
-  const handleReset = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(""); setSuccess("");
-    if (otp.length !== 6) { setError("Please enter the 6-digit code."); return; }
-    if (!isStrongPassword(newPassword)) { setError("Password does not meet strength requirements."); return; }
-    if (newPassword !== confirmPassword) { setError("Passwords do not match."); return; }
-    setLoading(true);
-    try {
-      const res = await nestApi.resetAdminPassword(email.trim(), otp, newPassword);
-      setSuccess(res.message || "Password reset successfully.");
-      setTimeout(() => { window.location.href = "/login"; }, 1500);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to reset password");
-    } finally { setLoading(false); }
-  };
-
-  const handleResend = async () => {
-    if (resendIn > 0) return;
-    setError(""); setSuccess("");
-    setLoading(true);
-    try {
-      const res = await nestApi.forgotAdminPassword(email.trim());
-      setSuccess(res.message || "Code resent.");
-      setResendIn(60);
-    } catch (err) { setError(err instanceof Error ? err.message : "Failed to resend"); }
-    finally { setLoading(false); }
   };
 
   return (
@@ -149,7 +47,7 @@ export default function ForgotPasswordPage() {
             </div>
           </div>
           <h1 className="mb-4 text-4xl font-bold leading-tight text-white">Secure<br /><span className="text-indigo-200">Password Recovery</span></h1>
-          <p className="max-w-md text-base leading-relaxed text-indigo-100/80">We’ll send a 6-digit code to your registered email to verify your identity before you set a new password.</p>
+          <p className="max-w-md text-base leading-relaxed text-indigo-100/80">We&apos;ll email you a secure reset link to set a new password. The link expires in 20 minutes.</p>
         </div>
         <div className="relative z-10 px-16 pb-8"><p className="text-xs text-indigo-200/50">© {new Date().getFullYear()} Imo Robotic Surgery and Oncology Center</p></div>
       </div>
@@ -165,17 +63,28 @@ export default function ForgotPasswordPage() {
               <KeyRound className="h-3.5 w-3.5 text-amber-600" />
               <span className="text-xs font-semibold text-amber-700">Forgot Password</span>
             </div>
-            <h2 className="text-2xl font-bold text-slate-900">{step === "email" ? "Reset your password" : "Enter verification code"}</h2>
+            <h2 className="text-2xl font-bold text-slate-900">{sent ? "Check your email" : "Reset your password"}</h2>
             <p className="mt-2 text-sm text-slate-500">
-              {step === "email" ? "Enter your admin email and we’ll send you a 6-digit code." : <>Code sent to <span className="font-semibold text-slate-900">{email}</span>. It expires in 10 minutes.</>}
+              {sent
+                ? <>If an account exists for <span className="font-semibold text-slate-900">{email}</span>, a reset link is on its way. It expires in 20 minutes.</>
+                : "Enter your admin email and we’ll send you a secure reset link."}
             </p>
           </div>
 
           {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
-          {success && <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{success}</div>}
 
-          {step === "email" ? (
-            <form onSubmit={handleSendCode} className="space-y-5">
+          {sent ? (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-6 text-center">
+              <CheckCircle2 className="mx-auto mb-3 h-10 w-10 text-emerald-600" />
+              <p className="text-sm text-emerald-800">
+                Open the link we sent to <span className="font-semibold">{email}</span> to choose a new password.
+              </p>
+              <button type="button" onClick={() => setSent(false)} className="mt-4 text-xs font-semibold text-indigo-600 hover:text-indigo-700">
+                Use a different email
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleSendLink} className="space-y-5">
               <div>
                 <label className="mb-1.5 block text-sm font-semibold text-slate-700">Email address</label>
                 <div className="relative">
@@ -184,56 +93,7 @@ export default function ForgotPasswordPage() {
                 </div>
               </div>
               <button type="submit" disabled={loading} className="h-11 w-full rounded-xl bg-indigo-600 text-sm font-semibold text-white shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50">
-                {loading ? <span className="flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Sending code...</span> : "Send reset code"}
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleReset} className="space-y-5">
-              <div>
-                <label className="mb-3 block text-sm font-semibold text-slate-700">6-digit code</label>
-                <OtpInput value={otp} onChange={setOtp} />
-                <div className="mt-3 flex items-center justify-between">
-                  <button type="button" onClick={() => setStep("email")} className="text-xs font-medium text-slate-500 hover:text-indigo-600">Change email</button>
-                  <button type="button" onClick={handleResend} disabled={resendIn > 0 || loading} className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 disabled:text-slate-400">
-                    {resendIn > 0 ? `Resend in ${resendIn}s` : "Resend code"}
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-sm font-semibold text-slate-700">New password</label>
-                <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 z-10" />
-                  <PasswordInput value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="At least 8 characters" required className="h-11 w-full rounded-xl border border-slate-300 bg-white pl-10 text-sm outline-none ring-4 ring-indigo-100 focus:border-indigo-500 focus:ring-indigo-100" />
-                </div>
-                <div className="mt-2 grid grid-cols-2 gap-1.5">
-                  {[
-                    { ok: checks.length, label: "8+ characters" },
-                    { ok: checks.upper, label: "Uppercase" },
-                    { ok: checks.lower, label: "Lowercase" },
-                    { ok: checks.number, label: "Number" },
-                    { ok: checks.special, label: "Special char" },
-                  ].map((c) => (
-                    <span key={c.label} className={`flex items-center gap-1 text-xs ${c.ok ? "text-emerald-600" : "text-slate-400"}`}>
-                      {c.ok ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />} {c.label}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Confirm new password</label>
-                <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 z-10" />
-                  <PasswordInput value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Repeat new password" required className="h-11 w-full rounded-xl border border-slate-300 bg-white pl-10 text-sm outline-none ring-4 ring-indigo-100 focus:border-indigo-500 focus:ring-indigo-100" />
-                </div>
-                {confirmPassword && (
-                  <p className={`mt-1 text-xs ${passwordsMatch ? "text-emerald-600" : "text-red-600"}`}>{passwordsMatch ? "Passwords match" : "Passwords do not match"}</p>
-                )}
-              </div>
-
-              <button type="submit" disabled={loading || !canReset} className="h-11 w-full rounded-xl bg-indigo-600 text-sm font-semibold text-white shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50">
-                {loading ? <span className="flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Resetting...</span> : "Reset password"}
+                {loading ? <span className="flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Sending link...</span> : "Send reset link"}
               </button>
             </form>
           )}
